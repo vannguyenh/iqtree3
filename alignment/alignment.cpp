@@ -1722,31 +1722,15 @@ StateType Alignment::convertState(char state, SeqType seq_type) {
         }
         return state;
         case SEQ_GENOTYPE:
-            switch (state) {
-                case 'A':
-                    return 0;
-                case 'C':
-                    return 1;
-                case 'G':
-                    return 2;
-                case 'T':
-                    return 3;
-                case 'M':
-                    return 1+2+3; // A or C, Amino
-                case 'R':
-                    return 1+4+3; // A or G, Purine
-                case 'W':
-                    return 1+8+3; // A or T, Weak
-                case 'S':
-                    return 2+4+3; // G or C, Strong
-                case 'Y':
-                    return 2+8+3; // C or T, Pyrimidine
-                case 'K':
-                    return 4+8+3; // G or T, Keto
-                case 'N':
-                default:
-                    return STATE_INVALID; // unrecognised characters
-            }
+            if (state == 'N') return STATE_UNKNOWN;
+            loc = strchr(symbols_genotype, state);
+
+            if (!loc) return STATE_INVALID; // unrecognize character
+            state = loc - symbols_protein;
+            if (state < num_states)
+                return state;
+            else
+                return STATE_UNKNOWN;
     case SEQ_PROTEIN: // Protein
 //		if (state == 'B') return 4+8+19;
 //		if (state == 'Z') return 32+64+19;
@@ -2076,6 +2060,7 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
             throw "Counts Format pattern is built in Alignment::readCountsFormat().";
             break;
         case SEQ_GENOTYPE:
+            // TODO: genotype num_state
             num_states = 10;
             cout << "Alignment most likely contains genotype matrix" << endl;
             break;
