@@ -33,6 +33,7 @@ using namespace Eigen;
 char symbols_protein[] = "ARNDCQEGHILKMFPSTWYVX"; // X for unknown AA
 char symbols_dna[]     = "ACGT";
 char symbols_rna[]     = "ACGU";
+char symbols_genotype[]      = "ACGTMRWSYK";
 //char symbols_binary[]  = "01";
 char symbols_morph[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
 // genetic code from tri-nucleotides (AAA, AAC, AAG, AAT, ..., TTT) to amino-acids
@@ -1539,6 +1540,7 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
     size_t num_bin   = 0;
     size_t num_alpha = 0;
     size_t num_digit = 0;
+    size_t num_genotype    = 0;
     double detectStart = getRealTime();
     size_t sequenceCount = sequences.size();
 #ifdef _OPENMP
@@ -1564,6 +1566,9 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
                         num_bin++;
                     }
                 }
+                if ((*i) == 'M' || (*i) == 'R' || (*i) == 'W' || (*i) == 'S' || (*i) == 'Y' || (*i) == 'K') {
+                    ++num_genotype;
+                }
             }
             if (isalpha(*i)) {
                 num_alpha++;
@@ -1577,6 +1582,8 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
         return SEQ_DNA;
     if (num_bin == num_ungap) // For binary data, only 0, 1, ?, -, . can occur
         return SEQ_BINARY;
+    if (((double)num_nuc + num_genotype ) / num_ungap > 0.9)
+        return SEQ_GENOTYPE;
     if (((double)num_alpha + num_nuc) / num_ungap > 0.9)
         return SEQ_PROTEIN;
     if (((double)(num_alpha + num_digit + num_nuc)) / num_ungap > 0.9)
@@ -1594,54 +1601,58 @@ void Alignment::buildStateMap(char *map, SeqType seq_type) {
     map[(unsigned char)'!'] = STATE_UNKNOWN; // frame shift
     int len;
     switch (seq_type) {
-    case SEQ_BINARY:
-        map[(unsigned char)'0'] = 0;
-        map[(unsigned char)'1'] = 1;
-        return;
-    case SEQ_DNA: // DNA
-	case SEQ_CODON:
-        map[(unsigned char)'A'] = 0;
-        map[(unsigned char)'C'] = 1;
-        map[(unsigned char)'G'] = 2;
-        map[(unsigned char)'T'] = 3;
-        map[(unsigned char)'U'] = 3;
-        map[(unsigned char)'R'] = 1+4+3; // A or G, Purine
-        map[(unsigned char)'Y'] = 2+8+3; // C or T, Pyrimidine
-        map[(unsigned char)'N'] = STATE_UNKNOWN;
-        map[(unsigned char)'X'] = STATE_UNKNOWN;
-        map[(unsigned char)'W'] = 1+8+3; // A or T, Weak
-        map[(unsigned char)'S'] = 2+4+3; // G or C, Strong
-        map[(unsigned char)'M'] = 1+2+3; // A or C, Amino
-        map[(unsigned char)'K'] = 4+8+3; // G or T, Keto
-        map[(unsigned char)'B'] = 2+4+8+3; // C or G or T
-        map[(unsigned char)'H'] = 1+2+8+3; // A or C or T
-        map[(unsigned char)'D'] = 1+4+8+3; // A or G or T
-        map[(unsigned char)'V'] = 1+2+4+3; // A or G or C
-        return;
-    case SEQ_PROTEIN: // Protein
-        for (int i = 0; i < 20; i++)
-            map[(int)symbols_protein[i]] = i;
-        map[(int)symbols_protein[20]] = STATE_UNKNOWN;
-//		map[(unsigned char)'B'] = 4+8+19; // N or D
-//		map[(unsigned char)'Z'] = 32+64+19; // Q or E
-        map[(unsigned char)'B'] = 20; // N or D
-        map[(unsigned char)'Z'] = 21; // Q or E
-        map[(unsigned char)'J'] = 22; // I or L
-        map[(unsigned char)'*'] = STATE_UNKNOWN; // stop codon
-        map[(unsigned char)'U'] = STATE_UNKNOWN; // 21st amino acid
-        map[(unsigned char)'O'] = STATE_UNKNOWN; // 22nd amino acid
-        return;
-    case SEQ_MULTISTATE:
-        for (int i = 0; i <= STATE_UNKNOWN; i++)
-            map[i] = i;
-        return;
-    case SEQ_MORPH: // Protein
-    	len = strlen(symbols_morph);
-        for (int i = 0; i < len; i++)
-            map[(int)symbols_morph[i]] = i;
-        return;
-    default:
-        return;
+        case SEQ_BINARY:
+            map[(unsigned char)'0'] = 0;
+            map[(unsigned char)'1'] = 1;
+            return;
+        case SEQ_DNA: // DNA
+        case SEQ_CODON:
+            map[(unsigned char)'A'] = 0;
+            map[(unsigned char)'C'] = 1;
+            map[(unsigned char)'G'] = 2;
+            map[(unsigned char)'T'] = 3;
+            map[(unsigned char)'U'] = 3;
+            map[(unsigned char)'R'] = 1+4+3; // A or G, Purine
+            map[(unsigned char)'Y'] = 2+8+3; // C or T, Pyrimidine
+            map[(unsigned char)'N'] = STATE_UNKNOWN;
+            map[(unsigned char)'X'] = STATE_UNKNOWN;
+            map[(unsigned char)'W'] = 1+8+3; // A or T, Weak
+            map[(unsigned char)'S'] = 2+4+3; // G or C, Strong
+            map[(unsigned char)'M'] = 1+2+3; // A or C, Amino
+            map[(unsigned char)'K'] = 4+8+3; // G or T, Keto
+            map[(unsigned char)'B'] = 2+4+8+3; // C or G or T
+            map[(unsigned char)'H'] = 1+2+8+3; // A or C or T
+            map[(unsigned char)'D'] = 1+4+8+3; // A or G or T
+            map[(unsigned char)'V'] = 1+2+4+3; // A or G or C
+            return;
+        case SEQ_GENOTYPE: // Genotype
+            for (int i = 0; i < STATE_UNKNOWN; i++)
+                map[(int)symbols_genotype[i]] = i;
+            return;
+        case SEQ_PROTEIN: // Protein
+            for (int i = 0; i < 20; i++)
+                map[(int)symbols_protein[i]] = i;
+            map[(int)symbols_protein[20]] = STATE_UNKNOWN;
+    //		map[(unsigned char)'B'] = 4+8+19; // N or D
+    //		map[(unsigned char)'Z'] = 32+64+19; // Q or E
+            map[(unsigned char)'B'] = 20; // N or D
+            map[(unsigned char)'Z'] = 21; // Q or E
+            map[(unsigned char)'J'] = 22; // I or L
+            map[(unsigned char)'*'] = STATE_UNKNOWN; // stop codon
+            map[(unsigned char)'U'] = STATE_UNKNOWN; // 21st amino acid
+            map[(unsigned char)'O'] = STATE_UNKNOWN; // 22nd amino acid
+            return;
+        case SEQ_MULTISTATE:
+            for (int i = 0; i <= STATE_UNKNOWN; i++)
+                map[i] = i;
+            return;
+        case SEQ_MORPH: // Protein
+            len = strlen(symbols_morph);
+            for (int i = 0; i < len; i++)
+                map[(int)symbols_morph[i]] = i;
+            return;
+        default:
+            return;
     }
 }
 
@@ -1709,6 +1720,32 @@ StateType Alignment::convertState(char state, SeqType seq_type) {
             return STATE_INVALID; // unrecognize character
         }
         return state;
+        case SEQ_GENOTYPE:
+            switch (state) {
+                case 'A':
+                    return 0;
+                case 'C':
+                    return 1;
+                case 'G':
+                    return 2;
+                case 'T':
+                    return 3;
+                case 'M':
+                    return 1+2+3; // A or C, Amino
+                case 'R':
+                    return 1+4+3; // A or G, Purine
+                case 'W':
+                    return 1+8+3; // A or T, Weak
+                case 'S':
+                    return 2+4+3; // G or C, Strong
+                case 'Y':
+                    return 2+8+3; // C or T, Pyrimidine
+                case 'K':
+                    return 4+8+3; // G or T, Keto
+                case 'N':
+                default:
+                    return STATE_INVALID; // unrecognised characters
+            }
     case SEQ_PROTEIN: // Protein
 //		if (state == 'B') return 4+8+19;
 //		if (state == 'Z') return 32+64+19;
@@ -1935,30 +1972,35 @@ SeqType Alignment::getSeqType(const char *sequence_type) {
         user_seq_type = SEQ_MULTISTATE;
     } else if (strncmp(sequence_type, "CODON", 5) == 0) {
         user_seq_type = SEQ_CODON;
+    } else if (strcmp(sequence_type, "GT") == 0) {
+        user_seq_type = SEQ_GENOTYPE;
     }
     return user_seq_type;
 }
 
 string Alignment::getSeqTypeStr(SeqType sequence_type) {
     switch (sequence_type) {
-    case SEQ_BINARY:
-        return "BIN";
-        break;
-    case SEQ_DNA:
-        return "DNA";
-        break;
-    case SEQ_PROTEIN:
-        return "PROT";
-        break;
-    case SEQ_MORPH:
-        return "MORPH";
-        break;
-    case SEQ_CODON:
-        return "CODON";
-        break;
-    default:
-        return "";
-        break;
+        case SEQ_BINARY:
+            return "BIN";
+            break;
+        case SEQ_DNA:
+            return "DNA";
+            break;
+        case SEQ_PROTEIN:
+            return "PROT";
+            break;
+        case SEQ_MORPH:
+            return "MORPH";
+            break;
+        case SEQ_CODON:
+            return "CODON";
+            break;
+        case SEQ_GENOTYPE:
+            return "GT";
+            break;
+        default:
+            return "";
+            break;
     }
 }
 
@@ -2012,26 +2054,31 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
     seq_type = detectSequenceType(sequences);
 
     switch (seq_type) {
-    case SEQ_BINARY:
-        num_states = 2;
-        cout << "Alignment most likely contains binary sequences" << endl;
-        break;
-    case SEQ_DNA:
-        num_states = 4;
-        cout << "Alignment most likely contains DNA/RNA sequences" << endl;
-        break;
-    case SEQ_PROTEIN:
-        num_states = 20;
-        cout << "Alignment most likely contains protein sequences" << endl;
-        break;
-    case SEQ_MORPH:
-        num_states = getMorphStates(sequences);
-        if (num_states < 2 || num_states > 32) throw "Invalid number of states.";
-        cout << "Alignment most likely contains " << num_states << "-state morphological data" << endl;
-        break;
-    case SEQ_POMO:
-        throw "Counts Format pattern is built in Alignment::readCountsFormat().";
-        break;
+        case SEQ_BINARY:
+            num_states = 2;
+            cout << "Alignment most likely contains binary sequences" << endl;
+            break;
+        case SEQ_DNA:
+            num_states = 4;
+            cout << "Alignment most likely contains DNA/RNA sequences" << endl;
+            break;
+        case SEQ_PROTEIN:
+            num_states = 20;
+            cout << "Alignment most likely contains protein sequences" << endl;
+            break;
+        case SEQ_MORPH:
+            num_states = getMorphStates(sequences);
+            if (num_states < 2 || num_states > 32) throw "Invalid number of states.";
+            cout << "Alignment most likely contains " << num_states << "-state morphological data" << endl;
+            break;
+        case SEQ_POMO:
+            throw "Counts Format pattern is built in Alignment::readCountsFormat().";
+            break;
+        case SEQ_GENOTYPE:
+            num_states = 10;
+            cout << "Alignment most likely contains genotype matrix" << endl;
+            break;
+
     default:
         if (!sequence_type)
             throw "Unknown sequence type.";
@@ -2045,6 +2092,9 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
         } else if (strcmp(sequence_type, "NT") == 0 || strcmp(sequence_type, "DNA") == 0) {
             num_states = 4;
             user_seq_type = SEQ_DNA;
+        } else if (strcmp(sequence_type, "GT") == 0) {
+            num_states = 10;
+            user_seq_type = SEQ_GENOTYPE;
         } else if (strcmp(sequence_type, "AA") == 0 || strcmp(sequence_type, "PROT") == 0) {
             num_states = 20;
             user_seq_type = SEQ_PROTEIN;
