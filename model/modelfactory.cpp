@@ -26,6 +26,7 @@
 #include "modeldna.h"
 #include "modelprotein.h"
 #include "modelbin.h"
+#include "modelmultistate.h"
 #include "modelcodon.h"
 #include "modelmorphology.h"
 #include "modelpomo.h"
@@ -167,6 +168,7 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
         if (tree->aln->seq_type == SEQ_DNA) model_str = "HKY";
         else if (tree->aln->seq_type == SEQ_PROTEIN) model_str = "LG";
         else if (tree->aln->seq_type == SEQ_BINARY) model_str = "GTR2";
+        else if (tree->aln->seq_type == SEQ_MULTISTATE) model_str = "GTRX";
         else if (tree->aln->seq_type == SEQ_CODON) model_str = "GY";
         else if (tree->aln->seq_type == SEQ_MORPH) model_str = "MK";
         else if (tree->aln->seq_type == SEQ_POMO) model_str = "HKY+P";
@@ -436,6 +438,7 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
     if (model_str.substr(0, 3) != "MIX" && freq_type == FREQ_UNKNOWN) {
         switch (tree->aln->seq_type) {
         case SEQ_BINARY: freq_type = FREQ_ESTIMATE; break; // default for binary: optimized frequencies
+        case SEQ_MULTISTATE: freq_type = FREQ_ESTIMATE; break; // default for multistate data: optimized frequencies
         case SEQ_PROTEIN: break; // let ModelProtein decide by itself
         case SEQ_MORPH: freq_type = FREQ_EQUAL; break;
         case SEQ_CODON: freq_type = FREQ_UNKNOWN; break;
