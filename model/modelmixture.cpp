@@ -17,6 +17,7 @@
 #include "modelpomo.h"
 //#include "phylokernelmixture.h"
 #include "modelpomomixture.h"
+#include "modelgenotype.h"
 
 using namespace std;
 
@@ -1094,7 +1095,7 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
             model_str = model_str.substr(0, spec_pos) + model_str.substr(end_pos);
         }
     }
-    
+
     if (!seqerr.empty() && tree->aln->seq_type != SEQ_DNA) {
         outError("Sequencing error model " + seqerr + " is only supported for DNA");
     }
@@ -1106,10 +1107,10 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
         string tmp_str = model_str;
         // extract model_name
         model_str = model_str.substr(0, pos);
-        
+
         // extract model params
         size_t end_pos = tmp_str.find(CLOSE_BRACKET);
-        
+
         // handle cases that user doesn't specify model parameters but supply state frequencies
         size_t pos_plus = model_str.find('+');
         if (pos_plus != string::npos)
@@ -1119,7 +1120,7 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
         }
         else
             model_params = tmp_str.substr(pos+1, end_pos-pos-1);
-        
+
         // extract freqs (if specified)
         pos = tmp_str.find("+FQ");
         if (pos != string::npos)
@@ -1127,7 +1128,7 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
         pos = tmp_str.find("+F{");
         if (pos != string::npos)
         {
-            freq_type = FREQ_USER_DEFINED; 
+            freq_type = FREQ_USER_DEFINED;
             tmp_str = tmp_str.substr(pos+3, tmp_str.length()-pos-3);
             end_pos = tmp_str.find(CLOSE_BRACKET);
             freq_params = tmp_str.substr(0, end_pos);
@@ -1175,8 +1176,10 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
 	} else if (tree->aln->seq_type == SEQ_CODON) {
 		model = new ModelCodon(model_str.c_str(), model_params, freq_type, freq_params, tree);
 	} else if (tree->aln->seq_type == SEQ_MORPH) {
-		model = new ModelMorphology(model_str.c_str(), model_params, freq_type, freq_params, tree);
-	} else {
+        model = new ModelMorphology(model_str.c_str(), model_params, freq_type, freq_params, tree);
+    } else if (tree->aln->seq_type == SEQ_GENOTYPE) {
+        model = new ModelGENOTYPE(model_str.c_str(), model_params, freq_type, freq_params, tree);
+    } else {
 		outError("Unsupported model type");
 	}
 
