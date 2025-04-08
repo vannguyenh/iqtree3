@@ -6374,15 +6374,18 @@ CandidateModel runModelSelection(Params &params, IQTree &iqtree, ModelCheckpoint
         }
         skip_all_when_drop = true;
     } else if (action == 3) {
-      char freq_set_multistate_protein[] = "FQ,FO";
-      char freq_set_codon[] = "FQ,F,F1X4,F3X4";
-      char freq_set_default[] = "FO";
-      char* init_state_freq_set =
-          (iqtree.aln->seq_type == SEQ_MULTISTATE || iqtree.aln->seq_type == SEQ_PROTEIN)
-              ? freq_set_multistate_protein
-              : (iqtree.aln->seq_type == SEQ_CODON)
-                  ? freq_set_codon
-                  : freq_set_default;
+        char freq_set_codon[] = ",F1X4,F3X4";
+        char freq_set_multistate[] = "FQ,FO";
+        char freq_set_protein[] = ",FO";
+        char freq_set_default[] = "FO";
+        char* init_state_freq_set =
+            (iqtree.aln->seq_type == SEQ_CODON)
+                ? freq_set_codon
+                : (iqtree.aln->seq_type == SEQ_MULTISTATE)
+                    ? freq_set_multistate
+                    : (iqtree.aln->seq_type == SEQ_PROTEIN)
+                        ? freq_set_protein
+                        : freq_set_default;
         if (!params.state_freq_set) {
             params.state_freq_set = init_state_freq_set;
         }
@@ -6548,15 +6551,18 @@ void optimiseQMixModel_method_update(Params &params, IQTree* &iqtree, ModelCheck
     double LR, df_diff, pvalue;
     string criteria_str;
 
-    char freq_set_multistate_protein[] = "FQ,FO";
-    char freq_set_codon[] = "FQ,F,F1X4,F3X4";
+    char freq_set_codon[] = ",F1X4,F3X4";
+    char freq_set_multistate[] = "FQ,FO";
+    char freq_set_protein[] = ",FO";
     char freq_set_default[] = "FO";
     char* init_state_freq_set =
-        (iqtree->aln->seq_type == SEQ_MULTISTATE || iqtree->aln->seq_type == SEQ_PROTEIN)
-            ? freq_set_multistate_protein
-            : (iqtree->aln->seq_type == SEQ_CODON)
-                ? freq_set_codon
-                : freq_set_default;
+        (iqtree->aln->seq_type == SEQ_CODON)
+            ? freq_set_codon
+            : (iqtree->aln->seq_type == SEQ_MULTISTATE)
+                ? freq_set_multistate
+                : (iqtree->aln->seq_type == SEQ_PROTEIN)
+                    ? freq_set_protein
+                    : freq_set_default;
     if (!params.state_freq_set) {
         params.state_freq_set = init_state_freq_set;
     }
