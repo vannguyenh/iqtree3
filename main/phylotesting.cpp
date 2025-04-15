@@ -6703,7 +6703,7 @@ void optimiseQMixModel(Params &params, IQTree* &iqtree, ModelCheckpoint &model_i
     params.stop_condition = SC_UNSUCCESS_ITERATION;
     
     if (iqtree->aln->seq_type == SEQ_MULTISTATE || iqtree->aln->seq_type == SEQ_MORPH) {
-        cout << endl << "MixtureFinder will also test models with unequal rates and/or frequencies. Make sure your data are multistate." << endl;
+        cout << endl << "MixtureFinder will also test models with unequal rates and/or frequencies" << endl;
         iqtree->aln->seq_type = SEQ_MULTISTATE;
     }
 
