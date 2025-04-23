@@ -172,7 +172,7 @@ void ModelMorphology::writeInfo(ostream &out) {
     }
 }
 
-void ModelMorphology::printMrBayesModelText(ofstream& out, string partition, string charset, bool isSuperTree, bool inclParams) {
+void ModelMorphology::printMrBayesModelText(ofstream& out, string partition, string charset) {
     warnLogStream("MrBayes only supports Morphological Data with states from {0-9}!", out);
     warnLogStream("Morphological Data with states {A-Z} may cause errors!", out);
     warnLogStream("Use Morphological Models in MrBayes with Caution!", out);
@@ -195,7 +195,7 @@ void ModelMorphology::printMrBayesModelText(ofstream& out, string partition, str
     bool hasGamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
     if (hasGamma) {
         // Rate Categories + Gamma
-        out << "gamma ngammacat=" << rate->getNRate();
+        out << "gamma";
     } else
         out << "equal";
 
@@ -204,23 +204,4 @@ void ModelMorphology::printMrBayesModelText(ofstream& out, string partition, str
     // ctype (ordered or not)
     if (strcmp(name.c_str(), "ORDERED") == 0)
         out << "  ctype ordered: " << charset << ";" << endl;
-
-    // Since morphological doesn't have state frequencies, if there are no parameters to prset, return
-    if (!inclParams || !rate->isFreeRate() && rate->getGammaShape() <= 0.0) return;
-
-    // Prset Parameters
-    out << "  prset applyto=(" << partition << ")";
-
-    // Freerate (+R)
-    // Get replacement Gamma Shape
-    if (rate->isFreeRate()) {
-        printMrBayesFreeRateReplacement(rate, charset, out, false);
-    }
-
-    // Gamma Distribution (+G/+R)
-    // Dirichlet is not available here, use fixed
-    if (rate->getGammaShape() > 0.0)
-        out << " shapepr=fixed(" << minValueCheckMrBayes(rate->getGammaShape()) << ")";
-
-    out << ";" << endl;
 }

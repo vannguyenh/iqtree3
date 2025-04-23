@@ -1182,7 +1182,7 @@ double ModelCodon::optimizeParameters(double gradient_epsilon) {
 	return score;
 }
 
-void ModelCodon::printMrBayesModelText(ofstream& out, string partition, string charset, bool isSuperTree, bool inclParams) {
+void ModelCodon::printMrBayesModelText(ofstream& out, string partition, string charset) {
     // NST should be 1 if fix_kappa is true (no ts/tv ratio), else it should be 2
     int nst = fix_kappa ? 1 : 2;
     int code = phylo_tree->aln->getGeneticCodeId();
@@ -1203,50 +1203,6 @@ void ModelCodon::printMrBayesModelText(ofstream& out, string partition, string c
     }
 
     out << "  lset applyto=(" << partition << ") nucmodel=codon omegavar=equal nst=" << nst << " code=" << mrBayesCode << ";" << endl;
-
-    if (!inclParams) return;
-
-    out << "  prset applyto=(" << partition << ") statefreqpr=dirichlet(";
-
-    // State Frequency Prior
-    bool isFirst = true;
-    for (int i = 0; i < num_states; i++) {
-        if (phylo_tree->aln->isStopCodon(i)) continue;
-
-        if (!isFirst) out << ", ";
-        else isFirst = false;
-
-        out << state_freq[i];
-    }
-
-    out << ")";
-
-    /*
-     * TS/TV Ratio (Kappa)
-     * Ratio Should be:
-     * `beta(kappa, 1)` when `codon_kappa_style` is `CK_ONE_KAPPA` (kappa here represents the ts/tv rate ratio)
-     * `beta(kappa, 1)` when `codon_kappa_style` is `CK_ONE_KAPPA_TS` (kappa here represents the transition rate)
-     * `beta(1, kappa)` when `codon_kappa_style` is `CK_ONE_KAPPA_TV` (kappa here represents the transversion rate)
-     * `beta(kappa, kappa2)` when `codon_kappa_style` is `CK_TWO_KAPPA` (kappa here represents the transition rate, and kappa2 represents the transversion rate)
-     */
-    if (!fix_kappa) {
-        double v1 = codon_kappa_style == CK_ONE_KAPPA_TV ? 1 : kappa;
-        double v2 = 1;
-        if (codon_kappa_style == CK_ONE_KAPPA_TV)
-            v2 = kappa;
-        else if (codon_kappa_style == CK_TWO_KAPPA)
-            v2 = kappa2;
-
-        out << " tratiopr=beta(" << v1 << ", " << v2 << ")";
-    }
-
-    // DN/DS Ratio (Omega)
-    // Ratio is set to `dirichlet(omega, 1)`
-    if (!fix_omega) {
-        out << " omegapr=dirichlet(" << omega << ", 1)";
-    }
-
-    out << ";" << endl;
 }
 
 void ModelCodon::writeInfo(ostream &out) {

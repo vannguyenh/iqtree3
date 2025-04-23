@@ -565,7 +565,7 @@ void ModelDNA::setVariables(double *variables) {
 //                      }
 }
 
-void ModelDNA::printMrBayesModelText(ofstream& out, string partition, string charset, bool isSuperTree, bool inclParams) {
+void ModelDNA::printMrBayesModelText(ofstream& out, string partition, string charset) {
     bool equalFreq = freq_type == FREQ_EQUAL;
     short nst = 6;
     RateHeterogeneity* rate = phylo_tree->getRate();
@@ -607,59 +607,9 @@ void ModelDNA::printMrBayesModelText(ofstream& out, string partition, string cha
         out << "propinv";
     else
         out << "equal";
-
-    // Rate Categories
-    if (hasGamma)
-        out << " ngammacat=" << rate->getNRate();
-
     out << ";" << endl;
 
-    // Priors (apart from Fixed Freq)
-    if (!inclParams) {
-        // If not include other params, simply set fixed frequency and return
-        if (!equalFreq) return;
+    if (!equalFreq) return;
 
-        out << "  prset applyto=(" << partition << ") statefreqpr=fixed(equal);" << endl;
-        return;
-    }
-
-    out << "  prset applyto=(" << partition << ")";
-
-    // Freerate (+R)
-    // Get replacement Gamma Shape + Invariable Sites
-    if (rate->isFreeRate()) {
-        printMrBayesFreeRateReplacement(isSuperTree, charset, out);
-    }
-
-    // Gamma Distribution (+G/+R)
-    // Dirichlet is not available here, use fixed
-    if (rate->getGammaShape() > 0.0)
-        out << " shapepr=fixed(" << minValueCheckMrBayes(rate->getGammaShape()) << ")";
-
-    // Invariable Sites (+I)
-    // Dirichlet is not available here, use fixed
-    if (rate->getPInvar() > 0.0)
-        out << " pinvarpr=fixed(" << minValueCheckMrBayes(rate->getPInvar()) << ")";
-
-    // Frequency of Nucleotides (+F)
-    if (equalFreq)
-        out << " statefreqpr=fixed(equal)";
-    else {
-        out << " statefreqpr=dirichlet(";
-        for (int i = 0; i < num_states; ++i) {
-            if (i != 0) out << ", ";
-            out << minValueCheckMrBayes(state_freq[i]);
-        }
-        out << ")";
-    }
-
-    // Reversible Rate Matrix
-    out << " revmatpr=dirichlet(";
-    for (int i = 0; i < getNumRateEntries(); ++i) {
-        if (i != 0) out << ", ";
-        out << minValueCheckMrBayes(rates[i]);
-    }
-
-    // Close revmatpr + prset
-    out << ");" << endl;
+    out << "  prset applyto=(" << partition << ") statefreqpr=fixed(equal);" << endl;
 }

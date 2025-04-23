@@ -1164,7 +1164,7 @@ void ModelProtein::computeTipLikelihood(PML::StateType state, double *state_lk) 
     state_lk[ambi_aa[cstate*2+1]] = 1.0;
 }
 
-void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string charset, bool isSuperTree, bool inclParams) {
+void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string charset) {
     // Lset Parameters
     out << "  lset applyto=(" << partition << ") nucmodel=protein rates=";
 
@@ -1183,11 +1183,6 @@ void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string
         out << "propinv";
     else
         out << "equal";
-
-    // Rate Categories
-    if (hasGamma)
-        out << " ngammacat=" << rate->getNRate();
-
     out << ";" << endl;
 
     out << "  prset applyto=(" << partition << ")";
@@ -1230,28 +1225,6 @@ void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string
         out << ")";
     }
 
-    // if not to include the parameters (for Protein, simply +I, +G, +R)
-    if (!inclParams) {
-        out << ";";
-        return;
-    }
-
-    // Freerate (+R)
-    // Get replacement Gamma Shape + Invariable Sites
-    if (rate->isFreeRate()) {
-        printMrBayesFreeRateReplacement(isSuperTree, charset, out);
-    }
-
-    // Gamma Distribution (+G/+R)
-    // Dirichlet is not available here, use fixed
-    if (rate->getGammaShape() > 0.0)
-        out << " shapepr=fixed(" << minValueCheckMrBayes(rate->getGammaShape()) << ")";
-
-    // Invariable Sites (+I)
-    // Dirichlet is not available here, use fixed
-    if (rate->getPInvar() > 0.0)
-        out << " pinvarpr=fixed(" << minValueCheckMrBayes(rate->getPInvar()) << ")";
-
-    out << ";" << endl;
+    out << ";";
 }
 

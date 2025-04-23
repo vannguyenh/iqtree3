@@ -1314,9 +1314,7 @@ void printOutfilesInfo(Params &params, IQTree &tree) {
     }
 
     if (params.mr_bayes_output) {
-        cout << endl << "MrBayes block written to:" << endl;
-        cout << "  Base template file:            " << params.out_prefix << ".mr_bayes_scheme.nex" << endl;
-        cout << "  Template file with parameters: " << params.out_prefix << ".mr_bayes_model.nex" << endl;
+        cout << endl << "MrBayes block written to:" <<  params.out_prefix << ".mr_bayes.nex" << endl;
     }
     cout << endl;
 
@@ -3302,27 +3300,20 @@ SuperNeighbor* findRootedNeighbour(SuperNeighbor* super_root, int part_id) {
     return nullptr;
 }
 
-void printMrBayesBlockFile(const char* filename, IQTree* &iqtree, bool inclParams) {
+void printMrBayesBlockFile(const char* filename, IQTree* &iqtree) {
     ofstream out;
     try {
         out.exceptions(ios::failbit | ios::badbit);
         out.open(filename);
 
         string provide = "basic models";
-        if (inclParams) provide = "optimized values";
-        else if (iqtree->isSuperTree()) provide = "basic partition structure and models";
+        if (iqtree->isSuperTree()) provide = "basic partition structure and models";
 
         // Write Warning
         out << "#nexus" << endl << endl
             <<"[This MrBayes Block Declaration provides the " << provide << " from the IQTree Run.]" << endl
-            << "[Note that MrBayes does not support a large collection of models, so defaults of 'nst=6' for DNA and 'wag' for Protein will be used if a model that does not exist in MrBayes is used.]" << endl;
-
-        if (inclParams)
-            out << "[However, for those cases, there will still be a rate matrix provided.]" << endl
-                << "[For DNA, this will still mean the rates may vary outside the restrictions of the model.]" << endl
-                << "[For Protein, this is essentially a perfect replacement.]" << endl;
-
-        out << "[Furthermore, the Model Parameter '+R' will be replaced by '+G'.]" << endl
+            << "[Note that MrBayes does not support a large collection of models, so defaults of 'nst=6' for DNA and 'wag' for Protein will be used if a model that does not exist in MrBayes is used.]" << endl
+            << "[Furthermore, the Model Parameter '+R' will be replaced by '+G+I'.]" << endl
             << "[This should be used as a Template Only.]" << endl << endl;
 
         // Begin File, Print Charsets
@@ -3332,11 +3323,8 @@ void printMrBayesBlockFile(const char* filename, IQTree* &iqtree, bool inclParam
     }
 
     if (!iqtree->isSuperTree()) {
-        // Set Outgroup (if available)
-        if (!iqtree->rooted) out << "  outgroup " << iqtree->root->name << ";" << endl << endl;
-
         out << "  [Using Model '" << iqtree->getModelName() << "']" << endl;
-        iqtree->getModel()->printMrBayesModelText(out, "all", "", false, inclParams);
+        iqtree->getModel()->printMrBayesModelText(out, "all", "");
 
         out << endl << "end;" << endl;
         out.close();
@@ -3371,9 +3359,6 @@ void printMrBayesBlockFile(const char* filename, IQTree* &iqtree, bool inclParam
     // Set Partition for Use
     out << "  set partition = iqtree;" << endl;
 
-    // Set Outgroup (if available)
-    if (!superTree->rooted) out << "  outgroup " << superTree->root->name << ";" << endl << endl;
-
     // Partition-Specific Model Information
     for (int part = 0; part < size; part++) {
         PhyloTree* currentTree = superTree->at(part);
@@ -3381,7 +3366,7 @@ void printMrBayesBlockFile(const char* filename, IQTree* &iqtree, bool inclParam
         // MrBayes Partitions are 1-indexed
         out << "  [Partition No. " << convertIntToString(part + 1) << ", Using Model '" << currentTree->getModelName() << "']" << endl;
         currentTree->getModel()->printMrBayesModelText(out,
-                convertIntToString(part + 1), saln->partitions[part]->name, true, inclParams);
+                convertIntToString(part + 1), saln->partitions[part]->name);
         out << endl;
     }
     out << "end;" << endl;
@@ -3913,8 +3898,7 @@ void runTreeReconstruction(Params &params, IQTree* &iqtree) {
     }
     if (params.mr_bayes_output) {
         cout << endl << "Writing MrBayes Block Files..." << endl;
-        printMrBayesBlockFile((string(params.out_prefix) + ".mr_bayes_scheme.nex").c_str(), iqtree, false);
-        printMrBayesBlockFile((string(params.out_prefix) + ".mr_bayes_model.nex").c_str(), iqtree, true);
+        printMrBayesBlockFile((string(params.out_prefix) + ".mr_bayes.nex").c_str(), iqtree);
         cout << endl;
     }
 
