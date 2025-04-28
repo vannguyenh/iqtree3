@@ -3295,13 +3295,13 @@ int64_t CandidateModelSet::getNextModel() {
             }
         }
     }
-    }
     if (next_model != current_model) {
         current_model = next_model;
         at(next_model).setFlag(MF_RUNNING);
-        return next_model;
     } else
-        return -1;
+        next_model = -1;
+    }
+    return next_model;
 }
 
 CandidateModel CandidateModelSet::evaluateAll(Params &params, PhyloTree* in_tree, ModelCheckpoint &model_info,
