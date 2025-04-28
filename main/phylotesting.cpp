@@ -29,7 +29,6 @@
 //#include "modeltest_wrapper.h"
 #include "model/modelprotein.h"
 #include "model/modelbin.h"
-#include "model/modelmultistate.h"
 #include "model/modelcodon.h"
 #include "model/modelmorphology.h"
 #include "model/modelmixture.h"
@@ -60,13 +59,6 @@
 
 /******* Binary model set ******/
 const char* bin_model_names[] = {"GTR2", "JC2"};
-
-
-/******* Multistate model set ******/
-const char* multistate_model_names[] = {"GTRX", "MK"};
-
-/* Multistate frequency set */
-const char* multistate_freq_names[] = {"FQ", "FO"};
 
 
 /******* Morphological model set ******/
@@ -214,7 +206,6 @@ const char* aa_usual_model = "LG";
 const char* aa_usual_nonrev_model = "NQ.pfam";
 const char* codon_usual_model = "GY+F3X4";
 const char* bin_usual_model = "GTR2";
-const char* multistate_usual_model = "GTRX";
 const char* morph_usual_model = "MK";
 const char* pomo_usual_model = "GTR+P";
 
@@ -252,7 +243,6 @@ string getUsualModelSubst(SeqType seq_type) {
                 return aa_usual_model;
         case SEQ_CODON: return codon_usual_model;
         case SEQ_BINARY: return bin_usual_model;
-        case SEQ_MULTISTATE: return multistate_usual_model;
         case SEQ_MORPH: return morph_usual_model;
         case SEQ_POMO: return pomo_usual_model;
         default: ASSERT(0 && "Unprocessed seq_type"); return "";
@@ -498,9 +488,6 @@ int detectSeqType(const char *model_name, SeqType &seq_type) {
             seq_type = SEQ_MORPH;
             break;
         }
-    if (model_str == "GTRX") {
-        seq_type = SEQ_MULTISTATE;
-    }
     copyCString(dna_model_names, sizeof(dna_model_names)/sizeof(char*), model_list, true);
     for (i = 0; i < model_list.size(); i++)
         if (model_str == model_list[i]) {
@@ -579,7 +566,6 @@ string convertSeqTypeToSeqTypeName(SeqType seq_type)
 {
     switch (seq_type) {
     case SEQ_BINARY: return "BIN"; break;
-    case SEQ_MULTISTATE: return "MULTISTATE"; break;
     case SEQ_MORPH: return "MORPH"; break;
     case SEQ_DNA: return "DNA"; break;
     case SEQ_PROTEIN: return "AA"; break;
@@ -957,16 +943,6 @@ void getModelSubst(SeqType seq_type, bool standard_code, string model_name,
         } else {
             convert_string_vec(model_set.c_str(), model_names);
         }
-    } else if (seq_type == SEQ_MULTISTATE) {
-        if (model_set.empty()) {
-            copyCString(multistate_model_names, sizeof(multistate_model_names) / sizeof(char*), model_names);
-        } else if (model_set[0] == '+') {
-            // append model_set into existing models
-            convert_string_vec(model_set.c_str()+1, model_names);
-            appendCString(multistate_model_names, sizeof(multistate_model_names) / sizeof(char*), model_names);
-        } else {
-            convert_string_vec(model_set.c_str(), model_names);
-        }
     } else if (seq_type == SEQ_MORPH) {
         if (model_set.empty()) {
             copyCString(morph_model_names, sizeof(morph_model_names) / sizeof(char*), model_names);
@@ -1172,9 +1148,6 @@ void getStateFreqs(SeqType seq_type, char *state_freq_set, StrVector &freq_names
     }
     if (freq_names.empty()) {
 		switch (seq_type) {
-      case SEQ_MULTISTATE:
-        copyCString(multistate_freq_names, sizeof(multistate_freq_names)/sizeof(char*), freq_names);
-        break;
 			case SEQ_DNA:
 				copyCString(dna_freq_names, sizeof(dna_freq_names)/sizeof(char*), freq_names);
 				break;
@@ -1241,13 +1214,13 @@ void getRateHet(SeqType seq_type, string model_name, double frac_invariant_sites
         if (with_new && rate_set != "1") {
             if (with_asc)
                 test_options = test_options_asc_new;
-            else if (seq_type == SEQ_DNA || seq_type == SEQ_BINARY || seq_type == SEQ_MULTISTATE || seq_type == SEQ_MORPH)
+            else if (seq_type == SEQ_DNA || seq_type == SEQ_BINARY || seq_type == SEQ_MORPH)
                 test_options = test_options_morph_new;
             else
                 test_options = test_options_noASC_I_new;
         } else if (with_asc)
             test_options = test_options_asc;
-        else if (seq_type == SEQ_DNA || seq_type == SEQ_BINARY || seq_type == SEQ_MULTISTATE || seq_type == SEQ_MORPH) {
+        else if (seq_type == SEQ_DNA || seq_type == SEQ_BINARY || seq_type == SEQ_MORPH) {
             if (rate_set == "1")
                 test_options = test_options_morph_fast;
             else
@@ -6375,13 +6348,13 @@ CandidateModel runModelSelection(Params &params, IQTree &iqtree, ModelCheckpoint
         skip_all_when_drop = true;
     } else if (action == 3) {
         char freq_set_codon[] = ",F1X4,F3X4";
-        char freq_set_multistate[] = "FQ,FO";
+        char freq_set_multistate[] = "FQ";
         char freq_set_protein[] = ",FO";
         char freq_set_default[] = "FO";
         char* init_state_freq_set =
             (iqtree.aln->seq_type == SEQ_CODON)
                 ? freq_set_codon
-                : (iqtree.aln->seq_type == SEQ_MULTISTATE)
+                : (iqtree.aln->seq_type == SEQ_MORPH)
                     ? freq_set_multistate
                     : (iqtree.aln->seq_type == SEQ_PROTEIN)
                         ? freq_set_protein
@@ -6552,13 +6525,13 @@ void optimiseQMixModel_method_update(Params &params, IQTree* &iqtree, ModelCheck
     string criteria_str;
 
     char freq_set_codon[] = ",F1X4,F3X4";
-    char freq_set_multistate[] = "FQ,FO";
+    char freq_set_multistate[] = "FQ";
     char freq_set_protein[] = ",FO";
     char freq_set_default[] = "FO";
     char* init_state_freq_set =
         (iqtree->aln->seq_type == SEQ_CODON)
             ? freq_set_codon
-            : (iqtree->aln->seq_type == SEQ_MULTISTATE)
+            : (iqtree->aln->seq_type == SEQ_MORPH)
                 ? freq_set_multistate
                 : (iqtree->aln->seq_type == SEQ_PROTEIN)
                     ? freq_set_protein
@@ -6578,7 +6551,12 @@ void optimiseQMixModel_method_update(Params &params, IQTree* &iqtree, ModelCheck
         getModelSubst(iqtree->aln->seq_type, iqtree->aln->isStandardGeneticCode(), params.model_name,
                       params.model_set, params.model_subset, model_names);
         getStateFreqs(iqtree->aln->seq_type, params.state_freq_set, freq_names);
-
+        
+        if (std::all_of(model_names.begin(), model_names.end(), [](const std::string& s) { return s == "MK"; }) &&
+            std::all_of(freq_names.begin(), freq_names.end(), [](const std::string& s) { return s == "+FQ"; })) {
+            outError("Error! Running MixtureFinder only with the MK model and the FQ frequency is completely meaningless. Please provide additional models and/or frequencies, such as GTRX, +F, and +FO, using -mset and/or -mfreq, if you really want to use MixtureFinder for your multistate data.");
+        }
+        
         nest_network = generateNestNetwork(model_names, freq_names);
     //}
 
@@ -6687,9 +6665,6 @@ void optimiseQMixModel(Params &params, IQTree* &iqtree, ModelCheckpoint &model_i
     if (iqtree->isSuperTree())
         outError("Error! The option -m '" + params.model_name + "' cannot work on data set with partitions");
     
-    if (!(iqtree->aln->seq_type == SEQ_DNA || iqtree->aln->seq_type == SEQ_CODON|| iqtree->aln->seq_type == SEQ_BINARY || iqtree->aln->seq_type == SEQ_MULTISTATE || iqtree->aln->seq_type == SEQ_MORPH || iqtree->aln->seq_type == SEQ_PROTEIN))
-        outError("Error! The option -m '" + params.model_name + "' can only work on DNA, codon, binary, multistate, and amino acid data set");
-
     cout << "--------------------------------------------------------------------" << endl;
     cout << "|                Optimizing Q-mixture model                        |" << endl;
     cout << "--------------------------------------------------------------------" << endl;
@@ -6701,11 +6676,6 @@ void optimiseQMixModel(Params &params, IQTree* &iqtree, ModelCheckpoint &model_i
     params.gbo_replicates = 0;
     params.consensus_type = CT_NONE;
     params.stop_condition = SC_UNSUCCESS_ITERATION;
-    
-    if (iqtree->aln->seq_type == SEQ_MULTISTATE || iqtree->aln->seq_type == SEQ_MORPH) {
-        cout << endl << "MixtureFinder will also test models with unequal rates and/or frequencies" << endl;
-        iqtree->aln->seq_type = SEQ_MULTISTATE;
-    }
 
     optimiseQMixModel_method_update(params, iqtree, model_info, model_str);
     

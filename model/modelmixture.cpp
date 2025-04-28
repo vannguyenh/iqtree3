@@ -10,7 +10,6 @@
 #include "modeldnaerror.h"
 #include "modelprotein.h"
 #include "modelbin.h"
-#include "modelmultistate.h"
 #include "modelcodon.h"
 #include "modelmorphology.h"
 #include "modelset.h"
@@ -1139,7 +1138,6 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
 	if ((model_str == "JC" && tree->aln->seq_type == SEQ_DNA) ||
 		(model_str == "POISSON" && tree->aln->seq_type == SEQ_PROTEIN) ||
 		(model_str == "JC2" && tree->aln->seq_type == SEQ_BINARY) ||
-    (model_str == "MK" && tree->aln->seq_type == SEQ_MULTISTATE) ||
 		(model_str == "JCC" && tree->aln->seq_type == SEQ_CODON) ||
 		(model_str == "MK" && tree->aln->seq_type == SEQ_MORPH))
 	{
@@ -1155,7 +1153,6 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
             cout << "PoMo mixture model for Gamma rate heterogeneity." << endl;
 //	else if ((model_str == "GTR" && tree->aln->seq_type == SEQ_DNA) ||
 //             (model_str == "GTR2" && tree->aln->seq_type == SEQ_BINARY) ||
-//             ((model_str == "GTR" || model_str == "GTRX") && model_str ==  SEQ_MULTISTATE) ||
 //             (model_str == "GTR20" && tree->aln->seq_type == SEQ_PROTEIN)) {
 //		model = new ModelGTR(tree, count_rates);
 //		if (freq_params != "")
@@ -1168,9 +1165,7 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
 	        model = ModelMarkov::getModelByName(model_str, tree, model_params, freq_type, freq_params);
 	} else if (tree->aln->seq_type == SEQ_BINARY) {
 		model = new ModelBIN(model_str.c_str(), model_params, freq_type, freq_params, tree);
-  } else if (tree->aln->seq_type == SEQ_MULTISTATE) {
-    model = new ModelMultistate(model_str.c_str(), model_params, freq_type, freq_params, tree);
-  } else if (tree->aln->seq_type == SEQ_DNA) {
+	} else if (tree->aln->seq_type == SEQ_DNA) {
         if (seqerr.empty())
             model = new ModelDNA(model_str.c_str(), model_params, freq_type, freq_params, tree);
         else

@@ -48,7 +48,6 @@
 //#include "modeltest_wrapper.h"
 #include "model/modelprotein.h"
 #include "model/modelbin.h"
-#include "model/modelmultistate.h"
 #include "model/modelcodon.h"
 #include "utils/stoprule.h"
 
@@ -250,7 +249,6 @@ void reportAlignment(ofstream &out, Alignment &alignment, int nremoved_seqs) {
             << alignment.getNSite() << " ";
     switch (alignment.seq_type) {
     case SEQ_BINARY: out << "binary"; break;
-    case SEQ_MULTISTATE: out << "multistate"; break;
     case SEQ_DNA: out << "nucleotide"; break;
     case SEQ_PROTEIN: out << "amino-acid"; break;
     case SEQ_CODON: out << "codon"; break;
@@ -2066,7 +2064,7 @@ void exportAliSimCMD(Params &params, IQTree &tree, ostream &out)
 {
     // make sure this method will not make IQTREE crashed
     if (!(params.aln_file || params.partition_file) || !params.out_prefix || !tree.aln || !tree.getModel()
-        || !(tree.aln->seq_type == SEQ_DNA || tree.aln->seq_type == SEQ_CODON || tree.aln->seq_type == SEQ_PROTEIN || tree.aln->seq_type == SEQ_BINARY || tree.aln->seq_type == SEQ_MULTISTATE || tree.aln->seq_type == SEQ_MORPH)
+        || !(tree.aln->seq_type == SEQ_DNA || tree.aln->seq_type == SEQ_CODON || tree.aln->seq_type == SEQ_PROTEIN || tree.aln->seq_type == SEQ_BINARY || tree.aln->seq_type == SEQ_MORPH)
         || tree.isTreeMix())
         return;
     
@@ -2078,7 +2076,7 @@ void exportAliSimCMD(Params &params, IQTree &tree, ostream &out)
     // skip unsupported models
     if (tree.getModel()->isMixture() || tree.getRate()->isHeterotachy() || tree.getModel()->isLieMarkov() || tree.aln->seq_type == SEQ_CODON)
     {
-        out << "Currently, we only support exporting AliSim commands automatically from the analysis for common models of DNA, Protein, Binary, Multistate, and Morphological data. To simulate data from other models (mixture, lie-markov, etc), please refer to the User Manual of AliSim. Thanks!" << endl << endl;
+        out << "Currently, we only support exporting AliSim commands automatically from the analysis for common models of DNA, Protein, Binary, and Morphological data. To simulate data from other models (mixture, lie-markov, etc), please refer to the User Manual of AliSim. Thanks!" << endl << endl;
         out << more_info << endl << endl;
         return;
     }
