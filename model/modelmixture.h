@@ -33,7 +33,7 @@ ModelSubst *createModel(string model_str, ModelsBlock *models_block,
 /**
  * parse parameters for PoMo or Genotype models
  * @param[in] seq_type type of sequences
- * @param[in] p_pos position of +/*P or +/*GT
+ * @param[in] p_pos position of +P or +GT
  * @param[in/out] model_str full name of the model
  * @param[out] pomo_heterozygosity heterozygousity of Pomo model
  * @param[out] pomo_rate_str stirng of rate heterogeneity

@@ -571,7 +571,7 @@ void reportModel(ostream &out, Alignment *aln, ModelSubst *m) {
     else
         ((ModelSet*)m)->front()->getRateMatrix(rate_mat);
 
-    if (m->num_states <= 4) {
+    if (m->num_states <= 4 || aln->seq_type == SEQ_GENOTYPE) {
         out << "Rate parameter R:" << endl << endl;
 
         if (m->isReversible()) {
@@ -1487,6 +1487,7 @@ void reportPhyloAnalysis(Params &params, IQTree &tree, ModelCheckpoint &model_in
                 case SEQ_MULTISTATE: out << "MULTI"; break;
                 case SEQ_PROTEIN: out << "AA"; break;
                 case SEQ_POMO: out << "POMO"; break;
+                case SEQ_GENOTYPE: out << "GT"; break;
                 case SEQ_UNKNOWN: out << "???"; break;
                 }
                 out << "\t" << (*it)->aln->getNSeq() << "\t" << (*it)->aln->getNSite()

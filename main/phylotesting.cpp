@@ -228,6 +228,7 @@ string getSeqTypeName(SeqType seq_type) {
         case SEQ_POMO: return "PoMo";
         case SEQ_UNKNOWN: return "unknown";
         case SEQ_MULTISTATE: return "MultiState";
+        case SEQ_GENOTYPE: return "Genotype";
     }
     return "unknown";
 }

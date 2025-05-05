@@ -20,6 +20,7 @@
 #include "utils/timeutil.h" //for getRealTime()
 #include "utils/progress.h" //for progress_display
 #include "alignmentsummary.h"
+#include "model/modelgenotype.h"
 
 #include <Eigen/LU>
 #ifdef USE_BOOST
@@ -1830,6 +1831,13 @@ char Alignment::convertStateBack(char state) {
             return symbols_morph[(int)state];
         else
             return '-';
+    case SEQ_GENOTYPE:
+        // genotype state
+        if (state < strlen(symbols_genotype))
+            return symbols_genotype[(int)state];
+        else
+            return '-';
+
     default:
     	// unknown
     	return '*';
@@ -1854,6 +1862,13 @@ string Alignment::convertStateBackStr(StateType state) {
         str += symbols_dna[state%4];
         return str;
 	}
+    if (seq_type == SEQ_GENOTYPE) {
+        // genotype data
+        if (state >= num_states) return "??";
+        str = symbols_dna[gt_nt_map[state].first];
+        str += symbols_dna[gt_nt_map[state].second];
+        return str;
+    }
     // all other data types
     str = convertStateBack(state);
 	return str;

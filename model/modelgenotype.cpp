@@ -114,3 +114,12 @@ string ModelGenotype::getNameParams(bool show_fixed_params) {
     }
     return retname.str();
 }
+
+void ModelGenotype::computeGenotypeRateMatrix() {
+    // TODO
+}
+
+void ModelGenotype::decomposeRateMatrix() {
+    computeGenotypeRateMatrix();
+    ModelMarkov::decomposeRateMatrix();
+}

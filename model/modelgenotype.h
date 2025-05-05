@@ -23,6 +23,8 @@
 #include "modelmarkov.h"
 #include "modeldna.h"
 
+static const vector<pair<int,int> > gt_nt_map = { {0,0}, {1,1}, {2,2}, {3,3}, {0,1}, {0,2}, {0,3}, {1,2}, {1,3}, {2,3} };
+
 /**
 Model for genotype matrix data
 
@@ -97,6 +99,14 @@ public:
         start structure for checkpointing
     */
     virtual void startCheckpoint();
+
+    /** main function to compute rate matrix */
+    void computeGenotypeRateMatrix();
+
+    /**
+        decompose the rate matrix into eigenvalues and eigenvectors
+    */
+    virtual void decomposeRateMatrix();
 
 protected:
     
