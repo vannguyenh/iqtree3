@@ -18,16 +18,54 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 #include "modelgenotype.h"
+#include "modeldna.h"
+#include "modelmixture.h"
+#include <stdlib.h>
+#include <assert.h>
+#include <string.h>
 
-ModelGENOTYPE::ModelGENOTYPE(const char *model_name, string model_params, StateFreqType freq, string freq_params, PhyloTree *tree)
-: ModelMarkov(tree)
-{
-	init(model_name, model_params, freq, freq_params);
+#include <Eigen/Dense>
+
+ModelGenotype::ModelGenotype(PhyloTree *tree) : ModelMarkov(tree) {
+    
 }
 
-void ModelGENOTYPE::init(const char *model_name, string model_params, StateFreqType freq, string freq_params)
+ModelGenotype::ModelGenotype(const char *model_name,
+                             string model_params,
+                             StateFreqType freq,
+                             string freq_params,
+                             PhyloTree *tree)
+: ModelMarkov(tree, true) {
+	init(model_name, model_params, freq_type, freq_params);
+}
+
+void ModelGenotype::init_base_model(const char *model_name,
+                                    string model_params,
+                                    StateFreqType freq_type,
+                                    string freq_params) {
+
+    string model_str = model_name;
+    if (ModelMarkov::validModelName(model_str))
+        base_model = ModelMarkov::getModelByName(model_str, phylo_tree, model_params, freq_type, freq_params);
+    else
+        base_model = new ModelDNA(model_name, model_params, freq_type, freq_params, phylo_tree);
+}
+
+string ModelGenotype::getName() {
+    return this->name;
+}
+
+//void ModelGenotype::init_frequencies() {
+//    freq_type = base_model->freq_type;
+//    
+//    switch (freq_type) {
+//        case FREQ_EQUAL
+//    }
+//}
+
+void ModelGenotype::init(const char *model_name, string model_params, StateFreqType freq, string freq_params)
 {
-	ASSERT(num_states == 10); // make sure that you create model for Binary data
+	ASSERT(num_states == 10);
 	StateFreqType def_freq = FREQ_UNKNOWN;
 	name = model_name;
 	full_name = model_name;
@@ -48,11 +86,11 @@ void ModelGENOTYPE::init(const char *model_name, string model_params, StateFreqT
 	ModelMarkov::init(freq);
 }
 
-void ModelGENOTYPE::startCheckpoint() {
-    checkpoint->startStruct("ModelGENOTYPE");
+void ModelGenotype::startCheckpoint() {
+    checkpoint->startStruct("ModelGenotype");
 }
 
-string ModelGENOTYPE::getNameParams(bool show_fixed_params) {
+string ModelGenotype::getNameParams(bool show_fixed_params) {
     //if (num_params == 0) return name;
     ostringstream retname;
     retname << name;

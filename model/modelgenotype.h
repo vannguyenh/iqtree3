@@ -21,30 +21,73 @@
 #define MODELGENOTYPE_H
 
 #include "modelmarkov.h"
+#include "modeldna.h"
 
 /**
 Model for genotype matrix data
 
-	@author BUI Quang Minh <minh.bui@univie.ac.at>
+	@author Van Nguyen Hoang <van.nguyenhoang@anu.edu.au>
 */
-class ModelGENOTYPE : public ModelMarkov
+class ModelGenotype : virtual public ModelMarkov
 {
 public:
 	/**
-		constructor
+        Constructor
+        ModelMarkov() constructor calls ModelSubst() constructor
+        ModelSubst():
+        - allocates state_freq[tree->aln->num_states]
+        ModelMarkov():
+        - allocateds rates[getNumRateEntries()] = rates[n*n(n-1)/2];
+        - allocates eigenvalues and eigenvectors.
+     
 		@param model_name model name, e.g., JC, HKY.
-		@param freq state frequency type
+        @param model_params The parameters of the model (user defined models).
+		@param freq_type
+        @param freq_params
 		@param tree associated phylogenetic tree
 	*/
-    ModelGENOTYPE(const char *model_name, string model_params, StateFreqType freq, string freq_params, PhyloTree *tree);
+    ModelGenotype(const char *model_name, string model_params, StateFreqType freq_type, string freq_params, PhyloTree *tree);
+    
+    ModelGenotype(PhyloTree *tree);
+    
+    //~ModelGenotype();
+    
+    // Tell the compiler we want both init functions
+    using ModelMarkov::init;
+    /**
+     Initialise the Genotype model. Run by constructor
+     @param model_name
+     @param model_params
+     @param freq_type
+     @param freq_params
+     */
 
 	/**
 		initialization, called automatically by the constructor, no need to call it
 		@param model_name model name, e.g., JC, HKY.
 		@param freq state frequency type
 	*/
-	virtual void init(const char *model_name, string model_params, StateFreqType freq, string freq_params);
+	virtual void init(const char *model_name,
+                      string model_params,
+                      StateFreqType freq_type,
+                      string freq_params);
+    
+    /**
+     Initialise the base model
+     Genotype model is built on top of any Markov model which is of class ModelMarkov in IQ-TREE.
+     The idea is to use the machinery of the underlying Markov model to extract nucleotide exchangeabilities parameters
+     and introduce an additional layer that adds genotype frequencies
+     */
+    void init_base_model(const char *model_name,
+                         string model_params,
+                         StateFreqType freq_type,
+                         string freq_params);
 
+    /**
+     @return model name
+     */
+    virtual string getName();
+    
 	/**
 	 * @return model name with parameters in form of e.g. GTR{a,b,c,d,e,f}
 	 */
@@ -55,6 +98,13 @@ public:
     */
     virtual void startCheckpoint();
 
+protected:
+    
+    ModelMarkov *base_model;
+    
+    /// Number of nucleotides (alleles).
+    int n_alleles;
+    
 };
 
 #endif

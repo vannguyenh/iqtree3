@@ -1173,7 +1173,7 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
         model = new ModelMorphology(model_str.c_str(), model_params, freq_type, freq_params, tree);
     } else if (tree->aln->seq_type == SEQ_GENOTYPE) {
         if (genotype_rate_str == "")
-            model = new ModelGENOTYPE(model_str.c_str(), model_params, freq_type, freq_params, tree);
+            model = new ModelGenotype(model_str.c_str(), model_params, freq_type, freq_params, tree);
         else
             outError("Sorry! We have not supported rate heterogeneity modl for gentoype type.");
     } else {
