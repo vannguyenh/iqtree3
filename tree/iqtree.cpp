@@ -696,7 +696,8 @@ void IQTree::computeInitialTree(LikelihoodKernel kernel, istream* in) {
 
         stringstream treeStr;
         this->sortTaxa();
-        this->printTree(treeStr, NULL);
+        //this->printTree(treeStr, NULL);
+        this->printTree(treeStr, 0);
         outfile << this->aln->getNSeq() << ' ' << 1 << endl;
         outfile << treeStr.str() << endl;
         outfile.close();
@@ -4685,6 +4686,11 @@ int PhyloTree::testNumThreads() {
 
     cout << "BEST NUMBER OF THREADS: " << bestProc+1 << endl << endl;
     setNumThreads(bestProc+1);
+    
+    // clear the relative treelength arrays if it is GHOST model
+    if (isMixlen()) {
+        ((PhyloTreeMixlen*)this)->clear_relative_treelen();
+    }
 
     return bestProc+1;
 #endif

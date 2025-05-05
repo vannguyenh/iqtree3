@@ -83,14 +83,113 @@ extern "C" {
 
 void reportReferences(Params &params, ofstream &out) {
 
-    out << "To cite IQ-TREE please use:" << endl << endl
-    << "Bui Quang Minh, Heiko A. Schmidt, Olga Chernomor, Dominik Schrempf," << endl
-    << "Michael D. Woodhams, Arndt von Haeseler, and Robert Lanfear (2020)" << endl
-    << "IQ-TREE 2: New models and efficient methods for phylogenetic inference" << endl
-    << "in the genomic era. Mol. Biol. Evol., in press." << endl
-    << "https://doi.org/10.1093/molbev/msaa015" << endl << endl;
+    out << "To cite IQ-TREE 3 please use:" << endl << endl
+    << "Thomas K.F. Wong, Nhan Ly-Trong, Huaiyan Ren, Hector Banos, Andrew J. Roger," << endl
+    << "Edward Susko, Chris Bielow, Nicola De Maio, Nick Goldman, Matthew W. Hahn," << endl
+    << "Gavin Huttley, Robert Lanfear, Bui Quang Minh (2025)" << endl
+    << "IQ-TREE 3: Phylogenomic Inference Software using Complex Evolutionary Models." << endl
+    << "Submitted." << endl << endl;
+
+    out << "Please also cite the following paper(s) for the feature(s) that you used:" << endl << endl;
     
     bool modelfinder_only = false;
+    if (params.model_name.find("MIX") != string::npos && params.model_name.find("MIX{") == string::npos) {
+        out << "To cite MixtureFinder please use: " << endl << endl
+            << "Huaiyan Ren, Thomas KF Wong, Bui Quang Minh, Robert Lanfear (2025)" << endl
+            << "MixtureFinder: Estimating DNA Mixture Models for Phylogenetic Analyses." << endl
+            << "Molecular Biology and Evolution, 42:msae264." << endl
+            << "https://doi.org/10.1093/molbev/msae264" << endl << endl;
+    }
+
+    if (params.optimize_linked_gtr) {
+        out << "To cite GTRpmix please use: " << endl << endl
+            << "Hector Banos, Thomas KF Wong, Justin Daneau, Edward Susko, Bui Quang Minh," << endl
+            << "Robert Lanfear, Matthew W Brown, Laura Eme, Andrew J Roger (2025)" << endl
+            << "GTRpmix: A linked general-time reversible model for profile mixture models." << endl
+            << "Molecular Biology and Evolution, 92:msae174." << endl
+            << "https://doi.org/10.1093/molbev/msae174" << endl << endl;
+    }
+
+    if (params.inference_alg != ALG_IQ_TREE) {
+        out << "To cite CMAPLE please use: " << endl << endl
+            << "Nhan Ly-Trong, Chris Bielow, Nicola De Maio, Bui Quang Minh (2024)" << endl
+            << "CMAPLE: Efficient phylogenetic inference in the pandemic era." << endl
+            << "Molecular Biology and Evolution, 41:msae134." << endl
+            << "https://doi.org/10.1093/molbev/msae134" << endl << endl;
+    }
+
+    if (params.model_name.find("+T") != string::npos) {
+        out << "To cite the MAST model \"+T\" please use: " << endl << endl
+            << "Thomas KF Wong, Caitlin Cherryh, Allen G Rodrigo, Matthew W Hahn, Bui Quang Minh, Robert Lanfear (2024)" << endl
+            << "MAST: Phylogenetic Inference with Mixtures Across Sites and Trees." << endl
+            << "Systematic Biology, 73:375–391." << endl
+            << "https://doi.org/10.1093/sysbio/syae008" << endl << endl;
+    }
+
+    if (params.consensus_type == CT_ASSIGN_SUPPORT_EXTENDED) {
+        out << "To cite site/gene concordance factor please use: " << endl << endl
+            << "Yu K Mo, Robert Lanfear, Matthew W Hahn, Bui Quang Minh (2023)" << endl
+            << "Updated site concordance factors minimize effects of homoplasy and taxon sampling." << endl
+            << "Bioinformatics, 39:btac741." << endl
+            << "https://doi.org/10.1093/bioinformatics/btac741" << endl << endl;
+    }
+
+    if (params.alisim_active) {
+        out << "To cite AliSim please use: " << endl << endl
+            << "Nhan Ly-Trong, Giuseppe MJ Barca, Bui Quang Minh (2023)" << endl
+            << "AliSim-HPC: parallel sequence simulator for phylogenetics." << endl
+            << "Bioinformatics, 39:btad540." << endl
+            << "https://doi.org/10.1093/bioinformatics/btad540" << endl << endl;
+    }
+
+    if (params.model_joint != "" && params.model_joint.find("NONREV") == string::npos) {
+        out << "To cite QMaker for estimating protein Q matrix please use: " << endl << endl
+            << "Bui Quang Minh, Cuong Cao Dang, Le Sy Vinh, Robert Lanfear (2021)" << endl
+            << "QMaker: Fast and Accurate Method to Estimate Empirical Models of Protein Evolution." << endl
+            << "Systematic Biology, 70:1046–1060." << endl
+            << "https://doi.org/10.1093/sysbio/syab010" << endl << endl;
+    }
+
+    if (params.model_joint != "" && params.model_joint.find("NONREV") != string::npos) {
+        out << "To cite nQMaker for estimating non-reversible Q matrix please use: " << endl << endl
+            << "Cuong Cao Dang, Bui Quang Minh, Hanon McShea, Joanna Masel, Jennifer E James, Le Sy Vinh,   Robert Lanfear (2022)" << endl
+            << "nQMaker: Estimating Time Nonreversible Amino Acid Substitution Models." << endl
+            << "Systematic Biology, 71:1110–1123." << endl
+            << "https://doi.org/10.1093/sysbio/syac007" << endl << endl;
+    }
+
+    if (params.consensus_type == CT_ROOTSTRAP) {
+        out << "To cite Rootstrap please use: " << endl << endl
+            << "Suha Naser-Khdour, Bui Quang Minh, Robert Lanfear (2022)" << endl
+            << "Assessing Confidence in Root Placement on Phylogenies: An Empirical Study Using Nonreversible Models for Mammals." << endl
+            << "Systematic Biology, 71:959–972." << endl
+            << "https://doi.org/10.1093/sysbio/syab067" << endl << endl;
+    }
+
+    if (params.model_name.find("+H") != string::npos) {
+        out << "To cite the GHOST \"+H\" please use: " << endl << endl
+            << "Stephen M Crotty, Bui Quang Minh, Nigel G Bean, Barbara R Holland, Jonathan Tuke, Lars S Jermiin, Arndt Von Haeseler (2020)" << endl
+            << "GHOST: Recovering Historical Signal from Heterotachously Evolved Sequence Alignments." << endl
+            << "Systematic Biology, 69:249-264." << endl
+            << "https://doi.org/10.1093/sysbio/syz051" << endl << endl;
+    }
+
+    if (params.symtest != SYMTEST_NONE) {
+        out << "To cite tests of symmetry please use: " << endl << endl
+            << "Suha Naser-Khdour, Bui Quang Minh, Wenqi Zhang, Eric A Stone, Robert Lanfear (2019)" << endl
+            << "The Prevalence and Impact of Model Violations in Phylogenetic Analysis." << endl
+            << "Genome Biology and Evolution, 11:3341-3352." << endl
+            << "https://doi.org/10.1093/gbe/evz193" << endl << endl;
+    }
+
+//    if (DecentTree) {
+//        out << "To cite WHAT please use: " << endl << endl
+//            << "Weiwen Wang, James Barbetti, Thomas Wong, Bryan Thornlow, Russ Corbett-Detig, Yatish Turakhia, Robert Lanfear, Bui Quang Minh (2023)" << endl
+//            << "DecentTree: scalable Neighbour-Joining for the genomic era." << endl
+//            << "Bioinformatics, 39:btad536." << endl
+//            << "https://doi.org/10.1093/bioinformatics/btad536" << endl << endl;
+//    }
+
     if (params.model_name.substr(0,4) == "TEST" || params.model_name.substr(0, 2) == "MF" || params.model_name.empty()) {
         out << "To cite ModelFinder please use: " << endl << endl
             << "Subha Kalyaanamoorthy, Bui Quang Minh, Thomas KF Wong, Arndt von Haeseler," << endl
@@ -102,10 +201,10 @@ void reportReferences(Params &params, ofstream &out) {
     }
     if (posPOMO(params.model_name) != string::npos) {
         out << "For polymorphism-aware models please cite:" << endl << endl
-            << "Dominik Schrempf, Bui Quang Minh, Nicola De Maio, Arndt von Haeseler, and Carolin Kosiol" << endl
-            << "(2016) Reversible polymorphism-aware phylogenetic models and their application to" << endl
-            << "tree inference. J. Theor. Biol., 407:362–370." << endl
-            << "https://doi.org/10.1016/j.jtbi.2016.07.042" << endl << endl;
+            << "Dominik Schrempf, Bui Quang Minh, Arndt von Haeseler, Carolin Kosiol (2019)" << endl
+            << "Polymorphism-Aware Species Trees with Advanced Mutation Models, Bootstrap, and Rate Heterogeneity" << endl
+            << "Molecular Biology and Evolution, 36:1294–1301." << endl
+            << "https://doi.org/10.1093/molbev/msz043" << endl << endl;
     }
 
     if (params.site_freq_file || params.tree_freq_file)
@@ -805,7 +904,7 @@ void reportTree(ofstream &out, Params &params, PhyloTree &tree, double tree_lh, 
     out << "Bayesian information criterion (BIC) score: " << BIC_score << endl;
 
     // mAIC report
-    if (tree.isSuperTree() && params.partition_type != TOPO_UNLINKED) {
+    if (tree.isSuperTree() && params.partition_type != TOPO_UNLINKED && !params.contain_nonrev) {
         // compute mAIC/mBIC/mAICc if it is a partition model
         int ntrees; //mix_df;
         double mix_lh;
@@ -1726,7 +1825,7 @@ void reportPhyloAnalysis(Params &params, IQTree &tree, ModelCheckpoint &model_in
             
             cout<<"\n-------------------------------------------------------------------\n";
             cout<<"The --terrace option is currently not available. Please, perform terrace analysis in a separate run using the following command line:\n";
-            cout<<"iqtree2 --gentrius <tree_file> -s <aln_file> -p <part_info_file>\n";
+            cout<<"iqtree3 --gentrius <tree_file> -s <aln_file> -p <part_info_file>\n";
             cout<<"For more information refer to the manual.\n";
             cout<<"-------------------------------------------------------------------\n";
             
@@ -2763,38 +2862,31 @@ void printMCMCFileFormat(PhyloTree *tree, MatrixXd &hessian, stringstream &tree_
                 counter++;
             }
             // here we check whether the first child of the partition tree is a leaf in the case of missing taxa.
-            if (leftSingle && counter==1 && (nei->link_neighbors[part_id]->node->neighbors.size()==1 || nei1->link_neighbors[part_id]->node->neighbors.size()==1))
-            {
+            if (leftSingle && counter == 1 && (nei->link_neighbors[part_id]->node->neighbors.size() == 1 || nei1->
+                link_neighbors[part_id]->node->neighbors.size() == 1)){
                 leftSingleRoot = true;
                 counter++;
             }
         }
         // Note: if we get an unrooted tree with left child is a leaf, we need to push it to back as the last branch
         // This is a special case in MCMCTree
-        if (leftSingleRoot)
-        {
+        if (leftSingleRoot){
             auto partBrM = partBrMmap.front();
             vector<pair<int, int>> partBrMapleftSingle;
             vector<pair<int, int>> partBrMmap2;
             int leftSinglePartId = partBrM.second;
 
-            for (auto it : partBrMmap)
-            {
-                if (it.second != leftSinglePartId)
-                {
+            // Note: multiples of same id could be mapped to the original tree
+            for (auto it : partBrMmap){
+                if (it.second != leftSinglePartId){
                     partBrMmap2.emplace_back(it.first, it.second);
-                }
-                else
-                {
+                }else{
                     partBrMapleftSingle.emplace_back(it.first, it.second);
                 }
             }
-
-            for (auto it : partBrMapleftSingle)
-            {
+            for (auto it : partBrMapleftSingle){
                 partBrMmap2.emplace_back(it.first, it.second);
             }
-
             partBrMmap = partBrMmap2;
         }
         int numStates = tree->getModel()->num_states;
@@ -2811,21 +2903,17 @@ void printMCMCFileFormat(PhyloTree *tree, MatrixXd &hessian, stringstream &tree_
         auto *hessian_diagonal_part = aligned_alloc<double>(branchNum);
         memset(hessian_diagonal_part, 0, branchNum * sizeof(double));
 
-//        double *G_matrix_sub_tree = tree->G_matrix;
+        double *G_matrix_sub_tree = tree->G_matrix;
         if (superTree->params->partition_type != BRLEN_OPTIMIZE) {
             for (auto mapping: partBrMmap) {
                 int stree_branch_id = mapping.first;
                 int part_branch_id = mapping.second;
-                for (int i = 0; i < nPtn; i++) {
-                    G_matrix_part[stree_branch_id * nPtn + i] = tree->G_matrix[part_branch_id * nPtn + i];
-                }
-                //memcpy(G_matrix_part+(sizeof(double)*stree_branch_id*nPtn), G_matrix_sub_tree+sizeof(double)*(part_branch_id*nPtn), sizeof(double)*nPtn);
+                memmove(G_matrix_part+stree_branch_id*nPtn, G_matrix_sub_tree+part_branch_id*nPtn, sizeof(double)*nPtn);
                 gradient_vector_part[stree_branch_id] = tree->gradient_vector[part_branch_id];
                 hessian_diagonal_part[stree_branch_id] = tree->hessian_diagonal[part_branch_id];
             }
             saveTreeMCMCTree(branchLengths, branch_lengths_vector, tree, tree_stream);
         } else {
-
             DoubleVector branchLengths2;
             int branchCounter = 0;
             std::unordered_map<int, int> brVisitedMap;
@@ -2836,10 +2924,7 @@ void printMCMCFileFormat(PhyloTree *tree, MatrixXd &hessian, stringstream &tree_
                     continue;
                 }
                 brVisitedMap[part_branch_id] = 1;
-                for (int i = 0; i < nPtn; i++) {
-                    G_matrix_part[branchCounter * nPtn + i] = tree->G_matrix[part_branch_id * nPtn + i];
-                }
-                //memcpy(G_matrix_part+(sizeof(double)*stree_branch_id*nPtn), G_matrix_sub_tree+sizeof(double)*(part_branch_id*nPtn), sizeof(double)*nPtn);
+                memmove(G_matrix_part+branchCounter*nPtn, G_matrix_sub_tree+part_branch_id*nPtn, sizeof(double)*nPtn);
                 gradient_vector_part[branchCounter] = tree->gradient_vector[part_branch_id];
                 hessian_diagonal_part[branchCounter] = tree->hessian_diagonal[part_branch_id];
                 branchLengths2.push_back(branchLengths[part_branch_id]);
@@ -2847,7 +2932,6 @@ void printMCMCFileFormat(PhyloTree *tree, MatrixXd &hessian, stringstream &tree_
             }
             saveTreeMCMCTree(branchLengths2, branch_lengths_vector, tree, tree_stream);
         }
-
         processDervMCMCTree(gradient_vector_part, branchNum, nPtn, G_matrix_part, ptn_freq_diagonal,
                             gradient_vector_eigen, hessian, hessian_diagonal_part);
         aligned_free(G_matrix_part);
@@ -2855,10 +2939,50 @@ void printMCMCFileFormat(PhyloTree *tree, MatrixXd &hessian, stringstream &tree_
         aligned_free(hessian_diagonal_part);
 
     } else {
-        processDervMCMCTree(tree->gradient_vector, nBranches, nPtn, tree->G_matrix, ptn_freq_diagonal,
-                            gradient_vector_eigen, hessian, tree->hessian_diagonal);
-        saveTreeMCMCTree(branchLengths, branch_lengths_vector, tree, tree_stream);
 
+        int numStates = tree->getModel()->num_states;
+        size_t mem_size = get_safe_upper_limit(tree->getAlnNSite()) + max(get_safe_upper_limit(numStates),
+                                                                          get_safe_upper_limit(tree->getModelFactory()->unobserved_ptns.size()));
+        BranchVector singleAlnBranches;
+        tree->getBranches(singleAlnBranches);
+        vector<int> branch_ids;
+        for (Branch branch: singleAlnBranches){
+            auto nei = branch.first->findNeighbor(branch.second);
+            branch_ids.push_back(nei->id);
+        }
+        if (leftSingle){
+            int single_root = branch_ids.front();
+            branch_ids.erase(branch_ids.begin());
+            branch_ids.push_back(single_root);
+        }
+        size_t branchNum = tree->branchNum;
+        size_t g_matrix_size = branchNum * mem_size;
+        auto *G_matrix_new = aligned_alloc<double>(g_matrix_size);
+        memset(G_matrix_new, 0, g_matrix_size * sizeof(double));
+        auto *gradient_vector_new = aligned_alloc<double>(branchNum);
+        memset(gradient_vector_new, 0, branchNum * sizeof(double));
+        auto *hessian_diagonal_new = aligned_alloc<double>(branchNum);
+        memset(hessian_diagonal_new, 0, branchNum * sizeof(double));
+
+        double *G_matrix_tree = tree->G_matrix;
+        int br_counter = 0;
+        DoubleVector branchLengthsNew;
+        for (int  br_id: branch_ids) {
+            memmove(G_matrix_new+br_counter*nPtn, G_matrix_tree+br_id*nPtn, sizeof(double)*nPtn);
+            gradient_vector_new[br_counter] = tree->gradient_vector[br_id];
+            hessian_diagonal_new[br_counter] = tree->hessian_diagonal[br_id];
+            branchLengthsNew.push_back(branchLengths[br_id]);
+            br_counter++;
+        }
+
+
+        processDervMCMCTree(gradient_vector_new, nBranches, nPtn, G_matrix_new, ptn_freq_diagonal,
+                            gradient_vector_eigen, hessian, hessian_diagonal_new);
+        saveTreeMCMCTree(branchLengthsNew, branch_lengths_vector, tree, tree_stream);
+
+        aligned_free(G_matrix_new);
+        aligned_free(gradient_vector_new);
+        aligned_free(hessian_diagonal_new);
     }
 }
 
@@ -2869,7 +2993,7 @@ void generateDummyAlignment(PhyloTree* tree, ofstream &dummyAlignment){
     // auto alignment = tree->aln->getPattern(0);
     tree->getOrderedTaxa(nodeVector);
     dummyAlignment << "   " << nodeVector.size() << "   " << 1 << endl;
-    for (Node *node: nodeVector) {
+    for (const Node *node: nodeVector) {
         dummyAlignment << node->name << "              " << "A" << endl;
     }
     dummyAlignment << endl;
@@ -2883,7 +3007,6 @@ void printMCMCTreeCtlFile(IQTree *iqtree, ofstream &ctl, ofstream &dummyAlignmen
     } else {
         ndata = 1;
     }
-
     StrVector mcmc_iter_vec;
     convert_string_vec(Params::getInstance().mcmc_iter.c_str(), mcmc_iter_vec, ',');
     ctl << "seed = -1" << endl
@@ -2995,38 +3118,10 @@ void printHessian(IQTree *iqtree, int partition_type) {
             RowVectorXd partition_branch_lengths_vector;
             RowVectorXd partition_gradient_vector_eigen;
 
-            if (it->traversal_starting_node)
-            {
+            if (it->traversal_starting_node){
                 auto part_traversal_starting_nei = (Neighbor*)(((Node*)it->traversal_starting_node)->neighbors[0]->node)
                 ->findNeighbor((Node*)it->traversal_starting_node);
                 it->root = part_traversal_starting_nei->node;
-
-                // This is special case in MCMCtree: if the fist son of root has only one taxa, then select the next neighbour.
-                // if (part_traversal_starting_nei->node->neighbors.size() == 1 && it->leftSingleRoot)
-                // {
-                //     // leftSingle = true;
-                //     part_traversal_starting_nei = (PhyloNeighbor*)((part_traversal_starting_nei->node)->
-                //         findNeighbor((part_traversal_starting_nei->node->neighbors[0]->node)));
-                //     it->root = part_traversal_starting_nei->node;
-                //
-                //     NeighborVec neighbors = part_traversal_starting_nei->node->neighbors;
-                //     auto nei1 = part_traversal_starting_nei->node->neighbors[0];
-                //     auto nei2 = part_traversal_starting_nei->node->neighbors[1];
-                //     auto nei3 = part_traversal_starting_nei->node->neighbors[2];
-                //     if (part_traversal_starting_nei->node->neighbors[0]->node == it->traversal_starting_node)
-                //     {
-                //         part_traversal_starting_nei->node->neighbors[0] = nei2;
-                //         part_traversal_starting_nei->node->neighbors[1] = nei3;
-                //         part_traversal_starting_nei->node->neighbors[2] = nei1;
-                //     }
-                //     else if (part_traversal_starting_nei->node->neighbors[1]->node == it->traversal_starting_node)
-                //     {
-                //         part_traversal_starting_nei->node->neighbors[0] = nei1;
-                //         part_traversal_starting_nei->node->neighbors[1] = nei3;
-                //         part_traversal_starting_nei->node->neighbors[2] = nei2;
-                //     }
-                //
-                // }
             }
 
             printMCMCFileFormat(it, partition_hessian, partition_tree_stream, partition_branch_lengths_vector,
@@ -3080,36 +3175,20 @@ void printHessian(IQTree *iqtree, int partition_type) {
         size_t nBranches = iqtree->branchNum;
 
         // iqtree->sortTaxa();
-
-        if (iqtree->traversal_starting_node)
-        {
+        if (iqtree->traversal_starting_node){
             auto traversal_starting_nei = (Neighbor*)(((Node*)iqtree->traversal_starting_node)->neighbors[0]->node)
                 ->findNeighbor((Node*)iqtree->traversal_starting_node);
             iqtree->root = traversal_starting_nei->node;
-            iqtree->sortTaxa();
+            // iqtree->sortTaxa();
             iqtree->initializeTree();
 
             // This is special case in MCMCtree: if the fist son of root has only one taxa, then select the next neighbour.
-            if (traversal_starting_nei->node->neighbors.size() == 1)
-            {
-                traversal_starting_nei = (PhyloNeighbor*)((traversal_starting_nei->node)->findNeighbor(
-                    (traversal_starting_nei->node->neighbors[0]->node)));
-                iqtree->root = traversal_starting_nei->node;
-                // iqtree->sortTaxa();
-                // iqtree->initializeTree();
-                NeighborVec neighbors = traversal_starting_nei->node->neighbors;
-                auto nei1 = traversal_starting_nei->node->neighbors[0];
-                auto nei2 = traversal_starting_nei->node->neighbors[1];
-                auto nei3 = traversal_starting_nei->node->neighbors[2];
-                traversal_starting_nei->node->neighbors[0] = nei2;
-                traversal_starting_nei->node->neighbors[1] = nei3;
-                traversal_starting_nei->node->neighbors[2] = nei1;
-                // iqtree->sortTaxa();
-                iqtree->initializeTree();
+            if (traversal_starting_nei->node->neighbors.size() == 1){
+                iqtree->leftSingleRoot = true;
             }
         }
 
-        printMCMCFileFormat(iqtree, hessian, tree_stream, branch_lengths_vector, gradient_vector_eigen);
+        printMCMCFileFormat(iqtree, hessian, tree_stream, branch_lengths_vector, gradient_vector_eigen, NULL, 0, iqtree->leftSingleRoot);
 
         outfile << endl << iqtree->aln->getNSeq() << endl << endl;
         outfile << tree_stream.str() << endl << endl;
@@ -3126,7 +3205,7 @@ void printHessian(IQTree *iqtree, int partition_type) {
     alnFile.close();
 
     cout << endl << "Gradients and Hessians written to: " << outFileName << endl;
-    cout << "Ctl file for MCMCTree written to: " << ctlFileName << endl;
+    cout << "Ctl file for MCMCTree written to: " << ctlFileName << endl << endl;
     // cout << "Add time records calibrations to: " << iqtree->params->user_file << endl;
 }
 
@@ -3161,12 +3240,10 @@ SuperNeighbor* findRootedNeighbour(SuperNeighbor* super_root, int part_id) {
     if (!super_root) {
         return nullptr;
     }
-
     // Check if the root itself satisfies the condition
     if (super_root->link_neighbors[part_id]) {
         return super_root;
     }
-
     // Use a queue for level-order traversal
     std::queue<SuperNeighbor*> q;
     q.push(super_root);
@@ -3175,19 +3252,16 @@ SuperNeighbor* findRootedNeighbour(SuperNeighbor* super_root, int part_id) {
     while (!q.empty()) {
         auto current = q.front();
         q.pop();
-
         // Iterate over the current node's neighbors
         for (auto nei : current->node->neighbors) {
             auto super_nei = dynamic_cast<SuperNeighbor*>(nei);
             if (!super_nei) {
                 continue; // Skip invalid neighbors
             }
-
             // Check if this neighbor satisfies the condition
             if (super_nei->link_neighbors[part_id]) {
                 return super_nei;
             }
-
             // Add the neighbor to the queue for further exploration
             q.push(super_nei);
         }
@@ -3252,6 +3326,31 @@ void startTreeReconstruction(Params &params, IQTree* &iqtree, ModelCheckpoint &m
     runModelFinder(params, *iqtree, model_info, best_subst_name, best_rate_name, nest_network);
     
     optimiseQMixModel(params, iqtree, model_info);
+    
+    // if users want to perform tree dating (with mcmc)
+    // and if ModelFinder was run, the traversal starting node was incidently deleted (after copyTree and restoreCheckpoint)
+    // we have to delete tree nodes to force IQ-TREE to re-read the tree from the treefile
+
+    if (params.dating_method == "mcmctree" && params.dating_mf){
+        // if it's a supertree, delete all tree members
+        if (iqtree->isSuperTree()){
+            PhyloSuperTree* stree = (PhyloSuperTree*) iqtree;
+
+            // delete member trees one by one
+            for (PhyloSuperTree::iterator it = stree->begin(); it != stree->end(); it++){
+                if ((*it)->root){
+
+                    (*it)->freeNode();
+                    (*it)->root = NULL;
+                }
+            }
+        }
+        // delete the tree itself
+        if (iqtree->root){
+            iqtree->freeNode();
+            iqtree->root = NULL;
+        }
+    }
 }
         
 /**
@@ -3834,7 +3933,6 @@ void runTreeReconstruction(Params &params, IQTree* &iqtree) {
     //check for dating with MCMCTree
     if (params.dating_method == "mcmctree")
     {
-
         cout << endl << "--- Generating the gradients and the Hessian for MCMCTree ---" << endl;
         if (iqtree->isSuperTree())
         {
@@ -3842,7 +3940,7 @@ void runTreeReconstruction(Params &params, IQTree* &iqtree) {
             int part_id = 0;
             for (auto& it : *stree)
             {
-                auto* partition_tree = (PhyloTree*)it;
+                auto* partition_tree = it;
                 bool leftSingleRoot = false;
 
                 // If we memorized the traversal starting node -> find the corresponding traversal starting node for the current partition
@@ -3856,13 +3954,17 @@ void runTreeReconstruction(Params &params, IQTree* &iqtree) {
                     // identify whether there is missing taxa at the root. This is needed if we have a clade of 2 taxa at
                     // the root in the rooted tree. When unrooted, they become two children for root which is are leaves.
                     // if leftSingleRoot == true, that means the leaves at the root are not from a 2 leaves clade.
-                    for(auto linkedNei: nei->node->neighbors){
+                    for (auto linkedNei : nei->node->neighbors)
+                    {
                         auto superLinkedNei = (SuperNeighbor*)linkedNei;
-                        if(!superLinkedNei->link_neighbors[part_id]){
+                        if (!superLinkedNei->link_neighbors[part_id])
+                        {
                             leftSingleRoot = true;
+                        }else
+                        {
+                            it->root_available = false;
                         }
                     }
-
                     // this is the other case where we don't miss any nodes at the root but a leaf at the root
                     if (!leftSingleRoot && linked_super_nei->node->neighbors.size() == 1)
                     {
@@ -5106,11 +5208,6 @@ void runPhyloAnalysis(Params &params, Checkpoint *checkpoint, IQTree *&tree, Ali
         alignment = NULL; // from now on use tree->aln instead
 
         startTreeReconstruction(params, tree, *model_info);
-        if (params.dating_method == "mcmctree" && params.dating_mf)
-        {
-            cout << "Initializing rooted tree again from input tree file for MCMCtree dating ..." << endl;
-            tree->computeInitialTree(params.SSE);
-        }
         // call main tree reconstruction
         if (params.num_runs == 1) {
             runTreeReconstruction(params, tree);
@@ -5158,6 +5255,15 @@ void runPhyloAnalysis(Params &params, Checkpoint *checkpoint, IQTree *&tree, Ali
 
 void runPhyloAnalysis(Params &params, Checkpoint *checkpoint) {
     bool runCMapleAlg = false;
+    // if users want to compute SPRTA, enforce using CMAPLE
+    if (params.compute_SPRTA)
+    {
+        if (params.inference_alg != ALG_CMAPLE)
+        {
+            params.inference_alg = ALG_CMAPLE;
+            outWarning("Enforce using CMAPLE tree search algorithm for computing SPRTA.");
+        }
+    }
     // check and run CMaple algorithm (if users want to do so)
     if (params.inference_alg != ALG_IQ_TREE)
         runCMapleAlg = runCMaple(params);
@@ -5193,6 +5299,7 @@ bool runCMaple(Params &params)
     {
         // record the start time
         auto start = getRealTime();
+        auto start_cpu = getCPUTime();
 
         // Dummy variables
         std::string aln_path(params.aln_file);
@@ -5269,6 +5376,15 @@ bool runCMaple(Params &params)
             // Initialize a Tree
             const std::string input_treefile(params.user_file ? params.user_file : "");
             cmaple::Tree tree(&aln, &model, input_treefile, (params.fixed_branch_length == BRLEN_FIX), cmaple::ParamsBuilder().build());
+            
+            // transfer SPRTA options if any
+            if (params.compute_SPRTA)
+            {
+                tree.params->compute_SPRTA = params.compute_SPRTA;
+                tree.params->compute_SPRTA_zero_length_branches = params.SPRTA_zero_branches;
+                tree.params->print_SPRTA_less_info_seqs = params.SPRTA_zero_branches;
+                tree.params->output_alternative_spr = params.out_alter_spr;
+            }
 
             // Infer a phylogenetic tree
             const cmaple::Tree::TreeSearchType tree_search_type = cmaple::Tree::parseTreeSearchType(params.tree_search_type_str);
@@ -5284,6 +5400,10 @@ bool runCMaple(Params &params)
                 // if users input a tree -> depend on the setting in params (false ~ don't allow replacing (by default)
                 if (input_treefile.length())
                     allow_replacing_ML_tree = params.allow_replace_input_tree;
+                
+                // if SPRTA was computed, don't allow changing tree topology
+                if (params.compute_SPRTA)
+                    allow_replacing_ML_tree = false;
 
                 tree.computeBranchSupport(params.num_threads, params.aLRT_replicates, 0.1, allow_replacing_ML_tree, out_stream);
 
@@ -5305,6 +5425,22 @@ bool runCMaple(Params &params)
             ofstream out = ofstream(output_treefile);
             out << tree.exportNewick(tree_format);
             out.close();
+            
+            // Write tree file in NEXUS format (if computing SPRTA)
+            if (params.compute_SPRTA)
+            {
+                ofstream out = ofstream(output_treefile + ".nex");
+                out << tree.exportNexus(tree_format);
+                out.close();
+            }
+
+            // export a TSV file if SPRTA is computed and we output alternative SPRs
+            if (params.compute_SPRTA && params.out_alter_spr)
+            {
+                ofstream out = ofstream(output_treefile + ".tsv");
+                out << tree.exportTSV();
+                out.close();
+            }
 
             // Show model parameters
             if (cmaple::verbose_mode > cmaple::VB_QUIET)
@@ -5320,14 +5456,20 @@ bool runCMaple(Params &params)
             // Show information about output files
             std::cout << "Analysis results written to:" << std::endl;
             std::cout << "Maximum-likelihood tree:       " << output_treefile << std::endl;
-            /*if (params.aLRT_replicates)
-                std::cout << "Tree with aLRT-SH values:      " << prefix + ".aLRT_SH.treefile" << std::endl;*/
+            if (params.compute_SPRTA)
+                std::cout << "Tree in NEXUS format:      " << output_treefile + ".nex" << std::endl;
+            if (params.compute_SPRTA && params.out_alter_spr)
+                std::cout << "Meta data in TSV format:   " << output_treefile + ".tsv" << std::endl;
             std::cout << "Screen log file:               " << prefix + ".log" << std::endl << std::endl;
 
             // show runtime
             auto end = getRealTime();
-            if (cmaple::verbose_mode > cmaple::VB_QUIET)
-                cout << "CMAPLE Runtime: " << end - start << "s" << endl;
+            auto end_cpu = getCPUTime();
+            cout << "Total CPU time used: " << fixed << end_cpu - start_cpu << " sec (" <<
+                convert_time(end_cpu-start_cpu) << ")" << endl;
+            cout << "Total wall-clock time used: " << fixed << end - start << " sec (" <<
+                convert_time(end-start) << ")" << endl;
+            cout << endl;
         }
     }
     catch (std::invalid_argument e)
