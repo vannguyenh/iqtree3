@@ -3275,8 +3275,9 @@ SuperNeighbor* findRootedNeighbour(SuperNeighbor* super_root, int part_id) {
     return nullptr;
 }
 
-void printMrBayesBlockFile(const char* filename, IQTree* &iqtree) {
+void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
     ofstream out;
+    string filename = string(params.out_prefix) + ".mr_bayes.nex";
     try {
         out.exceptions(ios::failbit | ios::badbit);
         out.open(filename);
@@ -3344,6 +3345,18 @@ void printMrBayesBlockFile(const char* filename, IQTree* &iqtree) {
                 convertIntToString(part + 1), saln->partitions[part]->name);
         out << endl;
     }
+
+    // Partition Type Settings
+    if (params.partition_type != TOPO_UNLINKED) {
+        out << "unlink statefreq=(all) revmat=(all) shape=(all) pinvar=(all) tratio=(all);" << endl;
+        if (params.partition_type != BRLEN_FIX) {
+            out << "prset applyto=(all) ratepr=variable;" << endl;
+            if (params.partition_type != BRLEN_SCALE) {
+                out << "unlink brlens=(all);" << endl;
+            }
+        }
+    }
+
     out << "end;" << endl;
     out.close();
 }
@@ -3871,7 +3884,7 @@ void runTreeReconstruction(Params &params, IQTree* &iqtree) {
     }
     if (params.mr_bayes_output) {
         cout << endl << "Writing MrBayes Block Files..." << endl;
-        printMrBayesBlockFile((string(params.out_prefix) + ".mr_bayes.nex").c_str(), iqtree);
+        printMrBayesBlockFile(params, iqtree);
         cout << endl;
     }
 
