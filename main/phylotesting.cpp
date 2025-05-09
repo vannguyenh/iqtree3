@@ -6207,6 +6207,16 @@ void addModel(string model_str, string& new_model_str, string new_subst) {
     }
 }
 
+// initialise model frequency set in MixtureFinder for different sequence types
+char* initFreqSet(SeqType seq_type) {
+    switch (seq_type) {
+        case SEQ_CODON:   return ",F1X4,F3X4";
+        case SEQ_MORPH:   return "FQ";
+        case SEQ_PROTEIN: return ",FO";
+        default:          return "FO";
+    }
+}
+
 // This function is similar to runModelFinder, but it is designed for optimisation of Q-Mixture model
 // action: 1 - estimate the RHAS model
 //         2 - estimate the number of classes in a mixture model
@@ -6347,18 +6357,7 @@ CandidateModel runModelSelection(Params &params, IQTree &iqtree, ModelCheckpoint
         }
         skip_all_when_drop = true;
     } else if (action == 3) {
-        char freq_set_codon[] = ",F1X4,F3X4";
-        char freq_set_multistate[] = "FQ";
-        char freq_set_protein[] = ",FO";
-        char freq_set_default[] = "FO";
-        char* init_state_freq_set =
-            (iqtree.aln->seq_type == SEQ_CODON)
-                ? freq_set_codon
-                : (iqtree.aln->seq_type == SEQ_MORPH)
-                    ? freq_set_multistate
-                    : (iqtree.aln->seq_type == SEQ_PROTEIN)
-                        ? freq_set_protein
-                        : freq_set_default;
+        char* init_state_freq_set = initFreqSet(iqtree.aln->seq_type);
         if (!params.state_freq_set) {
             params.state_freq_set = init_state_freq_set;
         }
@@ -6367,6 +6366,7 @@ CandidateModel runModelSelection(Params &params, IQTree &iqtree, ModelCheckpoint
                       params.model_set, params.model_subset, model_names);
 
         if (model_names.empty())
+            free(init_state_freq_set);
             return best_model;
 
         getStateFreqs(iqtree.aln->seq_type, params.state_freq_set, freq_names);
@@ -6400,6 +6400,7 @@ CandidateModel runModelSelection(Params &params, IQTree &iqtree, ModelCheckpoint
                 candidate_models.push_back(CandidateModel(new_model_str, iqtree.getModelFactory()->site_rate->name, iqtree.aln, 0));
         }
 
+        free(init_state_freq_set);
         skip_all_when_drop = false;
     } else {
         params.ratehet_set = best_rate_name;
@@ -6524,18 +6525,7 @@ void optimiseQMixModel_method_update(Params &params, IQTree* &iqtree, ModelCheck
     double LR, df_diff, pvalue;
     string criteria_str;
 
-    char freq_set_codon[] = ",F1X4,F3X4";
-    char freq_set_multistate[] = "FQ";
-    char freq_set_protein[] = ",FO";
-    char freq_set_default[] = "FO";
-    char* init_state_freq_set =
-        (iqtree->aln->seq_type == SEQ_CODON)
-            ? freq_set_codon
-            : (iqtree->aln->seq_type == SEQ_MORPH)
-                ? freq_set_multistate
-                : (iqtree->aln->seq_type == SEQ_PROTEIN)
-                    ? freq_set_protein
-                    : freq_set_default;
+    char* init_state_freq_set = initFreqSet(iqtree->aln->seq_type);
     if (!params.state_freq_set) {
         params.state_freq_set = init_state_freq_set;
     }
@@ -6561,7 +6551,7 @@ void optimiseQMixModel_method_update(Params &params, IQTree* &iqtree, ModelCheck
             nest_network = generateNestNetwork(model_names, freq_names);
         }
     //}
-
+    free(init_state_freq_set);
     // Step 1: run ModelFinder
     params.model_name = "";
     bool under_mix_finder = true;
