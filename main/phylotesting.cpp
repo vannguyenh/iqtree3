@@ -6544,7 +6544,7 @@ void optimiseQMixModel_method_update(Params &params, IQTree* &iqtree, ModelCheck
     ssize = iqtree->getAlnNSite();
     criteria_str = criterionName(params.model_test_criterion);
 
-    // Step 0: (reorder candidate models when -mset is used) build the nest-relationship network
+    // Step 0: (reorder candidate DNA models when -mset is used) build the nest-relationship network
     map<string, vector<string> > nest_network;
     //if (iqtree->aln->seq_type == SEQ_DNA) {
         StrVector model_names, freq_names;
@@ -6556,8 +6556,10 @@ void optimiseQMixModel_method_update(Params &params, IQTree* &iqtree, ModelCheck
             std::all_of(freq_names.begin(), freq_names.end(), [](const std::string& s) { return s == "+FQ"; })) {
             outError("Error! Running MixtureFinder only with the MK model and the FQ frequency is completely meaningless. Please provide additional models and/or frequencies, such as GTRX, +F, and +FO, using -mset and/or -mfreq, if you really want to use MixtureFinder for your multistate data.");
         }
-        
-        nest_network = generateNestNetwork(model_names, freq_names);
+
+        if (iqtree->aln->seq_type == SEQ_DNA) {
+            nest_network = generateNestNetwork(model_names, freq_names);
+        }
     //}
 
     // Step 1: run ModelFinder
