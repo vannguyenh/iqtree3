@@ -614,11 +614,10 @@ void ModelDNA::printMrBayesModelText(ofstream& out, string partition, string cha
         modelName.append("+I");
     }
 
-    out << "using MrBayes model " << modelName << "]" << endl;
+    out << "using MrBayes model " << modelName << (equalFreq ? "+FQ" : "") << "]" << endl;
     // NucModel = 4By4: DNA Nucleotides (4 Options, A, C, G, T)
     out << "  lset applyto=(" << partition << ") nucmodel=4by4 nst=" << nst << " rates=" << rateStr << ";" << endl;
 
-    if (!equalFreq) return;
-
-    out << "  prset applyto=(" << partition << ") statefreqpr=fixed(equal);" << endl;
+    if (equalFreq)
+        out << "  prset applyto=(" << partition << ") statefreqpr=fixed(equal);" << endl;
 }
