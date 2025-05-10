@@ -1314,7 +1314,7 @@ void printOutfilesInfo(Params &params, IQTree &tree) {
     }
 
     if (params.mr_bayes_output) {
-        cout << endl << "MrBayes block written to:" <<  params.out_prefix << ".mr_bayes.nex" << endl;
+        cout << "  MrBayes block written to:" <<  params.out_prefix << ".mr_bayes.nex" << endl;
     }
     cout << endl;
 
@@ -3299,7 +3299,7 @@ void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
     }
 
     if (!iqtree->isSuperTree()) {
-        out << "  [IQTree inferred model " << iqtree->getModelName() << ", " << endl;
+        out << "  [IQTree inferred model " << iqtree->getModelName() << ", ";
         iqtree->getModel()->printMrBayesModelText(out, "all", "");
 
         out << endl << "end;" << endl;
@@ -3333,13 +3333,13 @@ void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
     out << ";" << endl;
 
     // Set Partition for Use
-    out << "  set partition = iqtree;" << endl;
+    out << "  set partition = iqtree;" << endl << endl;
 
     // Partition-Specific Model Information
     for (int part = 0; part < size; part++) {
         PhyloTree* currentTree = superTree->at(part);
 
-        out << "  [Subset #" << part + 1 << " IQTree inferred model " << currentTree->getModelName() << ", ";
+        out << "  [Subset #" << part + 1 << ": IQTree inferred model " << currentTree->getModelName() << ", ";
         currentTree->getModel()->printMrBayesModelText(out,
                 convertIntToString(part + 1), saln->partitions[part]->name);
         out << endl;
