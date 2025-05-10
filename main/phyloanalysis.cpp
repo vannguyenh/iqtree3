@@ -1314,7 +1314,7 @@ void printOutfilesInfo(Params &params, IQTree &tree) {
     }
 
     if (params.mr_bayes_output) {
-        cout << "  MrBayes block written to:" <<  params.out_prefix << ".mr_bayes.nex" << endl;
+        cout << "  MrBayes block written to:      " <<  params.out_prefix << ".mr_bayes.nex" << endl;
     }
     cout << endl;
 
