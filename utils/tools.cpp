@@ -8236,11 +8236,6 @@ string getOutputNameWithExt(const InputType& format, const string& output_filepa
     }
 }
 
-void warnLogStream(string warn, ofstream &out, string indentation) {
-    outWarning(warn);
-    out << indentation << "[" << warn << "]" << endl;
-}
-
 double minValueCheckMrBayes(double origValue) {
      if (origValue < 0.01) {
          outWarning("MrBayes does not support values < 0.01! Using 0.01 instead...");

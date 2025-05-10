@@ -1165,27 +1165,7 @@ void ModelProtein::computeTipLikelihood(PML::StateType state, double *state_lk) 
 }
 
 void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string charset) {
-    // Lset Parameters
-    out << "  lset applyto=(" << partition << ") nucmodel=protein rates=";
-
     RateHeterogeneity* rate = phylo_tree->getRate();
-
-    // RHAS Specification
-    // Free Rate should be substituted by +G+I
-    bool hasGamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
-    bool hasInvariable = rate->getPInvar() != 0.0 || rate->isFreeRate();
-    if (hasGamma) {
-        if (hasInvariable)
-            out << "invgamma";
-        else
-            out << "gamma";
-    } else if (hasInvariable)
-        out << "propinv";
-    else
-        out << "equal";
-    out << ";" << endl;
-
-    out << "  prset applyto=(" << partition << ")";
 
     // Get MrBayes Model
     auto aaModelMap = getIqTreeToMrBayesAAModels();
@@ -1196,7 +1176,33 @@ void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string
     if (iter != aaModelMap.end())
         mappedModel = iter->second;
 
-    out << " aamodelpr=fixed(" << mappedModel << ")";
+    out << "using MrBayes model " << mappedModel;
+
+    // RHAS Specification
+    // Free Rate should be substituted by +G+I
+    bool hasGamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
+    bool hasInvariable = rate->getPInvar() != 0.0 || rate->isFreeRate();
+    string rateStr = "equal";
+    if (hasGamma) {
+        if (hasInvariable) {
+            rateStr = "invgamma";
+            out << "+G+I";
+        }
+        else {
+            rateStr = "gamma";
+            out << "+G";
+        }
+    } else if (hasInvariable) {
+        rateStr = "propinv";
+        out << "+I";
+    }
+
+    out << "]" << endl;
+
+    // Lset Parameters
+    out << "  lset applyto=(" << partition << ") nucmodel=protein rates=" << rateStr << ";" << endl;
+
+    out << "  prset applyto=(" << partition << ")" << " aamodelpr=fixed(" << mappedModel << ")";
 
     // GTR Customization
     if (strcmp(mappedModel.c_str(), "gtr") == 0) {

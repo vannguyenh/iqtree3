@@ -3299,7 +3299,7 @@ void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
     }
 
     if (!iqtree->isSuperTree()) {
-        out << "  [Using Model '" << iqtree->getModelName() << "']" << endl;
+        out << "  [IQTree inferred model " << iqtree->getModelName() << ", " << endl;
         iqtree->getModel()->printMrBayesModelText(out, "all", "");
 
         out << endl << "end;" << endl;
@@ -3339,8 +3339,7 @@ void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
     for (int part = 0; part < size; part++) {
         PhyloTree* currentTree = superTree->at(part);
 
-        // MrBayes Partitions are 1-indexed
-        out << "  [Partition No. " << convertIntToString(part + 1) << ", Using Model '" << currentTree->getModelName() << "']" << endl;
+        out << "  [Subset #" << part + 1 << " IQTree inferred model " << currentTree->getModelName() << ", ";
         currentTree->getModel()->printMrBayesModelText(out,
                 convertIntToString(part + 1), saln->partitions[part]->name);
         out << endl;

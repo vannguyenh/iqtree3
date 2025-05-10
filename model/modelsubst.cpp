@@ -212,8 +212,11 @@ double *ModelSubst::newTransMatrix() {
 }
 
 void ModelSubst::printMrBayesModelText(ofstream& out, string partition, string charset) {
-    out << "  [MrBayes Block Output is not supported by model " << name << ", skipped." << endl;
-    outWarning("MrBayes Block Output is not supported by this model of name '" + name + "'!");
+    out << "using MrBayes model GTR+G+I]" << endl;
+    out << "  [Model not supported by MrBayes, defaulting to GTR+G+I (DNA)]" << endl;
+    outWarning("MrBayes output is not supported by model " + name + ", defaulting to GTR+G+I (DNA)!");
+
+    out << "  lset applyto=(" << partition << ") nucmodel=4by4 nst=" << 6 << " rates=" << "invgamma" << ";" << endl;
 }
 
 ModelSubst::~ModelSubst()

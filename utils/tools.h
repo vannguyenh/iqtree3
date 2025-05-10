@@ -3818,14 +3818,6 @@ double frob_norm (double m[], int n, double scale=1.0);
 string getOutputNameWithExt(const InputType& format, const string& output_filepath);
 
 /**
- * Prints a warning message to the log and to the ofstream, in a NEXUS format.
- * @param warn the message to print
- * @param out the ofstream to print to
- * @param indentation optional indentation included only in ofstream. defaults to two spaces
- */
-void warnLogStream(string warn, ofstream &out, string indentation = "  ");
-
-/**
  * ensures a number, to be inputted into MrBayes, is larger than the minimum value for MrBayes (0.01)
  */
 double minValueCheckMrBayes(double origValue);

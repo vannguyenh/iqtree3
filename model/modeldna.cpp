@@ -568,6 +568,7 @@ void ModelDNA::setVariables(double *variables) {
 void ModelDNA::printMrBayesModelText(ofstream& out, string partition, string charset) {
     bool equalFreq = freq_type == FREQ_EQUAL;
     short nst = 6;
+    string modelName = "GTR";
     RateHeterogeneity* rate = phylo_tree->getRate();
 
     // Find NST value (1 for JC/JC69/F81, 2 for K80/K2P/HKY/HKY85, 6 for SYM/GTR)
@@ -577,37 +578,45 @@ void ModelDNA::printMrBayesModelText(ofstream& out, string partition, string cha
         // if all equal
         if (param_spec.find_first_not_of(param_spec[0]) == string::npos) {
             nst = 1;
+            modelName = "JC";
             // if A-G=C-T and everything else is equal to first part of dna code
         } else if (param_spec[1] == param_spec[4] &&
                 param_spec[0] == param_spec[2] && param_spec[0] == param_spec[3] && param_spec[0] == param_spec[5]) {
             nst = 2;
+            modelName = "HKY";
         }
     } else if (!name.empty()) {
         // Check the name of the model
         if (strcmp(name.c_str(), "JC") == 0 || strcmp(name.c_str(), "JC69") == 0 || strcmp(name.c_str(), "F81") == 0) {
             nst = 1;
+            modelName = "JC";
         } else if (strcmp(name.c_str(), "K80") == 0 || strcmp(name.c_str(), "K2P") == 0 || strcmp(name.c_str(), "HKY") == 0 || strcmp(name.c_str(), "HKY85") == 0) {
             nst = 2;
+            modelName = "HKY";
         }
     }
-
-    // NucModel = 4By4: DNA Nucleotides (4 Options, A, C, G, T)
-    out << "  lset applyto=(" << partition << ") nucmodel=4by4 nst=" << nst << " rates=";
 
     // RHAS Specification
     // Free Rate should be substituted by +G+I
     bool hasGamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
     bool hasInvariable = rate->getPInvar() != 0.0 || rate->isFreeRate();
+    string rateStr = "equal";
     if (hasGamma) {
-        if (hasInvariable)
-            out << "invgamma";
-        else
-            out << "gamma";
-    } else if (hasInvariable)
-        out << "propinv";
-    else
-        out << "equal";
-    out << ";" << endl;
+        if (hasInvariable) {
+            rateStr = "invgamma";
+            modelName.append("+G+I");
+        } else {
+            rateStr = "gamma";
+            modelName.append("+G");
+        }
+    } else if (hasInvariable) {
+        rateStr = "propinv";
+        modelName.append("+I");
+    }
+
+    out << "using MrBayes model " << modelName << "]" << endl;
+    // NucModel = 4By4: DNA Nucleotides (4 Options, A, C, G, T)
+    out << "  lset applyto=(" << partition << ") nucmodel=4by4 nst=" << nst << " rates=" << rateStr << ";" << endl;
 
     if (!equalFreq) return;
 
