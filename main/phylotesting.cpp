@@ -6375,7 +6375,7 @@ CandidateModel findMixtureComponent(Params &params, IQTree &iqtree, ModelCheckpo
                       params.model_set, params.model_subset, model_names);
 
         if (model_names.empty())
-            free(init_state_freq_set);
+            //free(init_state_freq_set);
             return best_model;
 
         getStateFreqs(iqtree.aln->seq_type, params.state_freq_set, freq_names);
@@ -6409,7 +6409,7 @@ CandidateModel findMixtureComponent(Params &params, IQTree &iqtree, ModelCheckpo
                 candidate_models.push_back(CandidateModel(new_model_str, iqtree.getModelFactory()->site_rate->name, iqtree.aln, 0));
         }
 
-        free(init_state_freq_set);
+        //free(init_state_freq_set);
         skip_all_when_drop = false;
     } else {
         params.ratehet_set = best_rate_name;
@@ -6550,22 +6550,28 @@ void runMixtureFinderMain(Params &params, IQTree* &iqtree, ModelCheckpoint &mode
 
     // Step 0: (reorder candidate DNA models when -mset is used) build the nest-relationship network
     map<string, vector<string> > nest_network;
-    //if (iqtree->aln->seq_type == SEQ_DNA) {
-        StrVector model_names, freq_names;
-        getModelSubst(iqtree->aln->seq_type, iqtree->aln->isStandardGeneticCode(), params.model_name,
-                      params.model_set, params.model_subset, model_names);
-        getStateFreqs(iqtree->aln->seq_type, params.state_freq_set, freq_names);
-        
-        if (std::all_of(model_names.begin(), model_names.end(), [](const std::string& s) { return s == "MK"; }) &&
-            std::all_of(freq_names.begin(), freq_names.end(), [](const std::string& s) { return s == "+FQ"; })) {
-            outError("Error! Running MixtureFinder only with the MK model and the FQ frequency is completely meaningless. Please provide additional models and/or frequencies, such as GTRX, +F, and +FO, using -mset and/or -mfreq, if you really want to use MixtureFinder for your multistate data.");
-        }
+    StrVector model_names, freq_names;
+    getModelSubst(iqtree->aln->seq_type, iqtree->aln->isStandardGeneticCode(), params.model_name,
+                  params.model_set, params.model_subset, model_names);
+    getStateFreqs(iqtree->aln->seq_type, params.state_freq_set, freq_names);
+    
+    // check if all models names are "MK" and all frequencies are "+FQ"
+    auto isOnlyMKAndFQ = [&]() -> bool {
+        bool onlyMK = std::all_of(model_names.begin(), model_names.end(),
+                                  [](const std::string& s) { return s == "MK"; });
+        bool onlyFQ = std::all_of(freq_names.begin(), freq_names.end(),
+                                  [](const std::string& s) { return s == "+FQ"; });
+        return onlyMK && onlyFQ;
+    };
+    if (isOnlyMKAndFQ()) {
+        outError("Error! Running MixtureFinder only with the MK model and the FQ frequency is completely meaningless. Please provide additional models and/or frequencies, such as GTRX, +F, and +FO, using -mset and/or -mfreq, if you really want to use MixtureFinder for your multistate data.");
+    }
 
-        if (iqtree->aln->seq_type == SEQ_DNA) {
-            nest_network = generateNestNetwork(model_names, freq_names);
-        }
-    //}
-    free(init_state_freq_set);
+    if (iqtree->aln->seq_type == SEQ_DNA) {
+        nest_network = generateNestNetwork(model_names, freq_names);
+    }
+    //free(init_state_freq_set);
+    
     // Step 1: run ModelFinder
     params.model_name = "";
     bool under_mix_finder = true;
