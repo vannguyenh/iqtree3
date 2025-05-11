@@ -6207,6 +6207,7 @@ void addModel(string model_str, string& new_model_str, string new_subst) {
     }
 }
 
+// initialise model frequency set in MixtureFinder for different sequence types
 char* initFreqSet(SeqType seq_type) {
     switch (seq_type) {
         case SEQ_CODON:   return ",F1X4,F3X4";
