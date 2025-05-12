@@ -6375,7 +6375,6 @@ CandidateModel findMixtureComponent(Params &params, IQTree &iqtree, ModelCheckpo
                       params.model_set, params.model_subset, model_names);
 
         if (model_names.empty())
-            //free(init_state_freq_set);
             return best_model;
 
         getStateFreqs(iqtree.aln->seq_type, params.state_freq_set, freq_names);
@@ -6409,7 +6408,6 @@ CandidateModel findMixtureComponent(Params &params, IQTree &iqtree, ModelCheckpo
                 candidate_models.push_back(CandidateModel(new_model_str, iqtree.getModelFactory()->site_rate->name, iqtree.aln, 0));
         }
 
-        //free(init_state_freq_set);
         skip_all_when_drop = false;
     } else {
         params.ratehet_set = best_rate_name;
@@ -6570,7 +6568,6 @@ void runMixtureFinderMain(Params &params, IQTree* &iqtree, ModelCheckpoint &mode
     if (iqtree->aln->seq_type == SEQ_DNA) {
         nest_network = generateNestNetwork(model_names, freq_names);
     }
-    //free(init_state_freq_set);
     
     // Step 1: run ModelFinder
     params.model_name = "";
