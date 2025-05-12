@@ -6786,15 +6786,15 @@ void reorderModelNames(StrVector& model_names, const char* model_set[], size_t s
 }
 
 bool isRateTypeNested(string rate_type1, string rate_type2) {
-    /*if (rate_type1.length() != 6) {
+    if (rate_type1.length() != 6) {
         outError("Incorrect DNA model rate type code: " + rate_type1);
     }
     if (rate_type2.length() != 6) {
         outError("Incorrect DNA model rate type code: " + rate_type2);
-    }*/
+    }
 
-    for (int i = 0; i < rate_type1.length()-1; i++) {
-        for (int j = i; j < rate_type1.length(); j++ ){
+    for (int i = 0; i < 5; i++) {
+        for (int j = i; j < 6; j++ ){
             if (rate_type1[i] == rate_type1[j] && rate_type2[i] != rate_type2[j]){
                 return false;
             }
