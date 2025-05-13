@@ -1880,7 +1880,49 @@ void Alignment::convertStateStr(string &str, SeqType seq_type) {
         (*it) = convertState(*it, seq_type);
 }
 */
- 
+Alignment* Alignment::decodeGenotypeToDNA(Alignment* gt_aln) {
+    assert(gt_aln->seq_type == SEQ_GENOTYPE);
+    size_t nseq = gt_aln->getNSeq();
+    size_t nsite = gt_aln->getNSite();
+    
+    // build two haplotype-strings per taxon
+    std::vector<std::string> hap1(nseq), hap2(nseq);
+    for (size_t i=0; i<nseq; ++i) {
+        hap1[i].reserve(nsite);
+        hap2[i].reserve(nsite);
+    }
+    
+    // fill them column-by-column
+    for (size_t s=0; s<nsite; ++s) {
+        Pattern pat = gt_aln->getPattern(s);
+        for (size_t i=0; i<nseq; ++i) {
+            std::string two = gt_aln->convertStateBackStr(pat[i]);
+            hap1[i].push_back(two[0]);
+            hap2[i].push_back(two[1]);
+        }
+    }
+    
+    // flatten to StrVector + new names
+    StrVector seqs2; seqs2.reserve(2*nseq);
+    std::vector<std::string> names2; names2.reserve(2*nseq);
+    
+    auto &origin_names = gt_aln->getSeqNames();
+    for (size_t i=0; i<nseq; ++i) {
+        seqs2.push_back(std::move(hap1[i]));
+        names2.push_back(origin_names[i] + "_hap1");
+        seqs2.push_back(std::move(hap2[i]));
+        names2.push_back(origin_names[i] + "_hap2");
+    }
+    
+    // build the DNA alignment
+    Alignment *dna_aln = new Alignment(*gt_aln);
+    dna_aln->seq_type = SEQ_DNA;
+    dna_aln->getSeqNames() = names2;
+    dna_aln->buildPattern(seqs2, (char*)"DNA", (int)seqs2.size(), (int)nsite);
+        
+    return dna_aln;
+}
+
 void Alignment::initCodon(char *gene_code_id) {
     // build index from 64 codons to non-stop codons
 	int transl_table = 1;

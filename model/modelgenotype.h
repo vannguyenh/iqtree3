@@ -52,7 +52,7 @@ public:
     
     ModelGenotype(PhyloTree *tree);
     
-    //~ModelGenotype();
+    ~ModelGenotype();
     
     // Tell the compiler we want both init functions
     using ModelMarkov::init;
@@ -63,12 +63,6 @@ public:
      @param freq_type
      @param freq_params
      */
-
-	/**
-		initialization, called automatically by the constructor, no need to call it
-		@param model_name model name, e.g., JC, HKY.
-		@param freq state frequency type
-	*/
 	virtual void init(const char *model_name,
                       string model_params,
                       StateFreqType freq_type,
@@ -84,7 +78,13 @@ public:
                          string model_params,
                          StateFreqType freq_type,
                          string freq_params);
-
+    
+    /**
+        \brief Initialise state frequencies
+        Use the machinery of the base model for nucleotides A C G T. 
+     */
+    void init_genotype_frequencies();
+    
     /**
      @return model name
      */
@@ -93,27 +93,53 @@ public:
 	/**
 	 * @return model name with parameters in form of e.g. GTR{a,b,c,d,e,f}
 	 */
-    virtual string getNameParams(bool show_fixed_params = false);
+    //virtual string getNameParams(bool show_fixed_params = false);
+
+    /**
+        set checkpoint object
+        @param checkpoint
+    */
+    virtual void setCheckpoint(Checkpoint *checkpoint);
 
     /**
         start structure for checkpointing
     */
     virtual void startCheckpoint();
 
-    /** main function to compute rate matrix */
+    /**
+        save object into the checkpoint
+    */
+    virtual void saveCheckpoint();
+
+    /**
+        Restore object from the checkpoint.
+    */
+    virtual void restoreCheckpoint();
+
+    /** main function to compute rate matrix
+        @param rate_matrix (OUT) Full rate matrix Q is filled with rate matrix entries
+        @param gt_freqs genotype frequencies
+        @param n_states number of states
+     */
     void computeGenotypeRateMatrix();
 
     /**
         decompose the rate matrix into eigenvalues and eigenvectors
     */
     virtual void decomposeRateMatrix();
+    /**
+        @return the number of rate entries, equal to the number of non-diagonal elements of the rate matrix
+        since we store full matrix here
+    */
+    virtual int getNumRateEntries() { return num_states*(num_states); }
+    
+    double **rate_matrix;
 
+    
 protected:
     
     ModelMarkov *base_model;
-    
-    /// Number of nucleotides (alleles).
-    int n_alleles;
+    int dna_states;
     
 };
 
