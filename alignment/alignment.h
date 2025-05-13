@@ -368,6 +368,13 @@ public:
 	 */
 	string convertStateBackStr(StateType state);
 
+    /**
+     * convert the genotype data into DNA format
+     * Note: works only with genotype data
+     * @param gt_aln gentoype alignment
+     * @return DNA alignment (size of aligment is double the genotype alignment)
+     */
+    static Alignment* decodeGenotypeToDNA(Alignment* gt_aln);
 	/**
             get alignment site range from the residue range relative to a sequence
             @param seq_id reference sequence
