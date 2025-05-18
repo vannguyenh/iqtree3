@@ -444,6 +444,9 @@ public:
         return num_params;
     }
     
+    // declare modelgenotype as friend class
+    friend class ModelGenotype;
+    
 protected:
 
 	/**

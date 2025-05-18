@@ -133,8 +133,6 @@ public:
     */
     virtual int getNumRateEntries() { return num_states*(num_states); }
     
-    double **rate_matrix;
-
     
 protected:
     

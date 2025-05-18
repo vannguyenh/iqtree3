@@ -864,7 +864,7 @@ public:
      */
     virtual int getMaxNumStates() { return num_states; }
 
-    /** either SEQ_BINARY, SEQ_DNA, SEQ_PROTEIN, SEQ_MORPH, or SEQ_CODON */
+    /** either SEQ_BINARY, SEQ_DNA, SEQ_PROTEIN, SEQ_MORPH, or SEQ_CODON  or SEQ_GENOTYPE*/
     SeqType seq_type;
 
     StateType STATE_UNKNOWN;
