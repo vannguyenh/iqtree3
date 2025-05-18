@@ -472,6 +472,7 @@ void StateSpace::initStateSpace(SeqType seqtype) {
     case SEQ_BINARY: name = "BIN"; break;
     case SEQ_PROTEIN: name = "AA"; break;
     case SEQ_MULTISTATE: name = "MULTI"; break;
+    case SEQ_GENOTYPE: name = "GT"; break;
     case SEQ_POMO: outError("Unhandled POMO state space"); break;
     case SEQ_UNKNOWN: ASSERT(0);
     }

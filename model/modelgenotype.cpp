@@ -48,16 +48,28 @@ void ModelGenotype::init_base_model(const char *model_name,
     Alignment* dna_aln = Alignment::decodeGenotypeToDNA(gt_aln);
     phylo_tree->aln = dna_aln;
     
-    string model_str = model_name;
-    if (ModelMarkov::validModelName(model_str))
-        base_model = ModelMarkov::getModelByName(model_str, phylo_tree, model_params, freq_type, freq_params);
-    else
-        base_model = new ModelDNA(model_name, model_params, freq_type, freq_params, phylo_tree);
+    try {
+        string model_str = model_name;
+        if (ModelMarkov::validModelName(model_str))
+            base_model = ModelMarkov::getModelByName(model_str, phylo_tree, model_params, freq_type, freq_params);
+        else
+            base_model = new ModelDNA(model_name, model_params, freq_type, freq_params, phylo_tree);
+    }
+    catch (string str) {
+        cout << "Error during initilisation of the base model of Gentoype. " << endl;
+        outError(str);
+    }
+
+    base_model->init(base_model->freq_type);
     
-    // restore original genotype alignment & clean up
+    // read any rate-parameter
+    if (! freq_params.empty())
+        base_model->readStateFreq(freq_params);
+    if (! model_params.empty())
+        base_model->readRates(model_params);
+    // reset original genotype alignment
     phylo_tree->aln = gt_aln;
-    // Option to clean up data
-    // delete dna_aln;
+    delete dna_aln;
 }
 
 string ModelGenotype::getName() {
@@ -66,7 +78,7 @@ string ModelGenotype::getName() {
 
 void ModelGenotype::init_genotype_frequencies() {
     // this one is not base model, it should be defined as GT10
-    Alignment* gt_aln = phylo_tree->aln;
+    freq_type = base_model->freq_type;
     switch (freq_type) {
         case FREQ_EQUAL: //'+FQ'
             for (int i=0; i < num_states; i++)
@@ -87,7 +99,6 @@ void ModelGenotype::init_genotype_frequencies() {
 void ModelGenotype::init(const char *model_name, string model_params, StateFreqType freq_type, string freq_params)
 {
     ASSERT(num_states == 10);
-    // StateFreqType def_freq = FREQ_UNKNOWN;
     // Initialise the parameters of GT10 model
     this->freq_type = freq_type;
     
@@ -95,30 +106,23 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     init_base_model(model_name, model_params, freq_type, freq_params);
     this->name = base_model->getName();
     
-    cout << "Base genotype model." << endl;
+    cout << "Initialised base genotype model of :"  << endl;
     cout << "Model name: " << this->name << endl;
-    cout << full_name << endl;
-
-    dna_states = base_model->num_states;
-    rates = new double[dna_states*dna_states];
-    rate_matrix = new double*[num_states];
-    for (int i = 0; i < num_states; i++)
-        rate_matrix[i] = new double[num_states];
-
+    
     // compute and install the GT10 frequencies
     init_genotype_frequencies();
-    // read any rate-parameter
-    if (! freq_params.empty())
-        readStateFreq(freq_params);
-    if (! model_params.empty())
-        readRates(model_params);
+    cout << "Model parameters provided: " << model_params << endl;
+    
+    cout << "Base model rates (after init): ";
+    for (int i = 0; i < 6; i++) {
+        cout << base_model->rates[i] << " ";
+    }
+    cout << endl;
 }
 
+
 ModelGenotype::~ModelGenotype() {
-  for(int i = 0; i < num_states; ++i)
-    delete[] rate_matrix[i];
-  delete[] rate_matrix;
-  delete[] rates;
+    delete base_model;
 }
 
 void ModelGenotype::setCheckpoint(Checkpoint *checkpoint) {
@@ -153,21 +157,25 @@ void ModelGenotype::restoreCheckpoint() {
 }
 
 void ModelGenotype::computeGenotypeRateMatrix() {
-    // TODO
-    int i, j;
+    // TODO: assign the right value into the rate matrix of GT10
     
+    // step 1: assign the right values into rates array of GT10
+    // step 2: computeRateMatrix by using computeRateMatrix function in
+    int i, j;
+    // rates has the size n*(n-1)/2
     for (i = 0; i < num_states; i++) {
+        double *this_rate = &rates[i*num_states];
         auto [a1, a2] = gt_nt_map[i];
-        
+                
         for (j = 0; j < num_states; j++) {
             auto [b1, b2] = gt_nt_map[j];
-            double exch = 0.0;
             if (a1 == b1 && a2 != b2) {
-                exch = rates[a2 * dna_states + b2];
+                if (a2 == 0) this_rate[j] = base_model->rates[b2];
+                else this_rate[j] = base_model->rates[a2+b2];
             } else if (a1 != b1 && a2 == b2) {
-                exch = rates[a1 * dna_states + b1];
-            }
-            rate_matrix[i][j] = exch * state_freq[j];
+                if (a1 == 0) this_rate[j] = base_model->rates[b1];
+                else this_rate[j] = base_model->rates[a1+b1];
+            } else this_rate[j] = 0.0;
         }
     }
 }
