@@ -46,7 +46,7 @@ void ModelGenotype::init_base_model(const char *model_name,
     // swap in decoded DNA
     
     // Trick ModelDNA constructor by setting the number of states to 4 (DNA).
-    phylo_tree->aln->num_states = n_alleles;
+    phylo_tree->aln->num_states = dna_states;
     
     try {
         string model_str = model_name;
@@ -105,7 +105,7 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     ASSERT(num_states == 10);
     // Initialise the parameters of GT10 model
     this->freq_type = freq_type;
-    n_alleles = 4;
+    dna_states = 4;
     
     // Initialise the base model on decoded DNA
     init_base_model(model_name, model_params, freq_type, freq_params);
@@ -116,8 +116,6 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     
     // compute and install the GT10 frequencies
     init_genotype_frequencies();
-    cout << "Model parameters provided: " << model_params << endl;
-    
     cout << "Base model rates (after init): ";
     for (int i = 0; i < 6; i++) {
         cout << base_model->rates[i] << " ";
@@ -142,7 +140,7 @@ void ModelGenotype::startCheckpoint() {
 void ModelGenotype::saveCheckpoint() {
     startCheckpoint();
     base_model->saveCheckpoint();
-    CKP_ARRAY_SAVE(n_alleles, base_model->state_freq);
+    CKP_ARRAY_SAVE(dna_states, base_model->state_freq);
     endCheckpoint();
     ModelMarkov::saveCheckpoint();
 }
@@ -150,7 +148,7 @@ void ModelGenotype::saveCheckpoint() {
 void ModelGenotype::restoreCheckpoint() {
     ModelMarkov::restoreCheckpoint();
     startCheckpoint();
-    CKP_ARRAY_RESTORE(n_alleles, base_model->state_freq);
+    CKP_ARRAY_RESTORE(dna_states, base_model->state_freq);
     base_model->restoreCheckpoint();
     endCheckpoint();
     
@@ -180,10 +178,10 @@ void ModelGenotype::computeGenotypeRateMatrix() {
             auto b2 = gt_nt_map[j].second;
             if (a1 == b1 && a2 != b2) {
                 // case 1: identical first base but different 2nd base
-                *this_rate = base_model->rates[base_id[a2*n_alleles+b2]];
+                *this_rate = base_model->rates[base_id[a2*dna_states+b2]];
             } else if (a1 != b1 && a2 == b2) {
                 // case 2: different 1st base but identical 2nd base
-                *this_rate = base_model->rates[base_id[a1*n_alleles+b1]];
+                *this_rate = base_model->rates[base_id[a1*dna_states+b1]];
             } else {
                 // case 3: both bases are different
                 *this_rate = 0.0;
@@ -194,4 +192,8 @@ void ModelGenotype::computeGenotypeRateMatrix() {
 void ModelGenotype::decomposeRateMatrix() {
     computeGenotypeRateMatrix();
     ModelMarkov::decomposeRateMatrix();
+}
+
+double ModelGenotype::optimizeParameters(double gradient_epsilon) {
+    
 }

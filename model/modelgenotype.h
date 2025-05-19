@@ -128,14 +128,13 @@ public:
     */
     virtual void decomposeRateMatrix();
     
-    /// Number of nucleotides (alleles).  This might be useful in the
-    /// future, when we do not restrict PoMo to DNA models only.
+    /// Number of nucleotides (states).  This might be useful in the
+    /// future, when we do not restrict Genotype to DNA models only.
     /// Eventual todo: do not hardcode this.
-    int n_alleles;
+    int dna_states;
     
     
 protected:
-    
     ModelMarkov *base_model;    
 };
 
