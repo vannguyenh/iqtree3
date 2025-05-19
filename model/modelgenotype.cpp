@@ -104,7 +104,6 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
 {
     ASSERT(num_states == 10);
     // Initialise the parameters of GT10 model
-    this->freq_type = freq_type;
     dna_states = 4;
     
     // Initialise the base model on decoded DNA
@@ -168,6 +167,7 @@ void ModelGenotype::computeGenotypeRateMatrix() {
     ASSERT(is_reversible && "Genotype model does not work with non-reversible DNA base model yet");
     // rates has the size n*(n-1)/2 for reversible base DNA models
     int count = 0;
+    // decode the exchangebilities between 2 nucleotides in gentoype 
     const int base_id[16] = {-1, 0, 1, 2, 0, -1, 3, 4, 1, 3, -1, 5, 2, 4, 5, -1};
     for (i = 0; i < num_states; i++)
         for (j = i+1; j < num_states; j++, count++) {
@@ -194,6 +194,61 @@ void ModelGenotype::decomposeRateMatrix() {
     ModelMarkov::decomposeRateMatrix();
 }
 
-double ModelGenotype::optimizeParameters(double gradient_epsilon) {
+void ModelGenotype::setVariables(double *variables) {
+    int nrate = base_model->getNDim();
     
+    if (is_reversible && freq_type == FREQ_ESTIMATE)
+        nrate -= (num_states -1);
+    
+    if (nrate > 0)
+        memcpy(variables+1, rates, nrate*sizeof(double));
+    
+    if (is_reversible && freq_type == FREQ_ESTIMATE) {
+        int ndim = base_model->getNDim();
+        memcpy(variables+(ndim-num_params+2), state_freq, (num_states-1)*sizeof(double));
+    }
 }
+
+bool ModelGenotype::getVariables(double *variables) {
+    bool changed = false;
+    changed = base_model->getVariables(variables);
+    int nrate = base_model->getNDim();
+    
+    int i;
+    if (is_reversible && freq_type == FREQ_ESTIMATE)
+        nrate -= (num_states-1);
+    if (nrate > 0) {
+        for (i = 0; i < nrate; i++)
+            changed |= (rates[i] != variables[i+1]);
+        memcpy(rates, variables+1, nrate * sizeof(double));
+    }
+    
+    if (is_reversible && freq_type == FREQ_ESTIMATE) {
+        int ndim = base_model->getNDim();
+        for (i = 0; i < num_states-1; i++)
+            changed |= (state_freq[i] != variables[i+ndim-num_states+2]);
+        memcpy(state_freq, variables+(ndim-num_states+2), (num_states-1)*sizeof(double));
+    }
+    return changed;
+}
+
+void ModelGenotype::setBounds(double *lower_bound, double *upper_bound, bool *bound_check) {
+    int i, ndim = base_model->getNDim();
+    
+    for (i = 1; i <= ndim; i++) {
+        lower_bound[i] = MIN_RATE;
+        upper_bound[i] = MAX_RATE;
+        bound_check[i] = false;
+    }
+    
+    if (is_reversible && freq_type == FREQ_ESTIMATE) {
+        for (i = num_params+1; i <= num_params+num_states-1; i++) {
+            lower_bound[i] = Params::getInstance().min_state_freq;
+            upper_bound[i] = 1.0;
+            bound_check[i] = false;
+        }
+    } else if (base_model->num_states == 4) {
+        setBoundsForFreqType(&lower_bound[num_params+1], &upper_bound[num_params+1], &bound_check[num_params+1], Params::getInstance().min_state_freq, freq_type);
+    }
+}
+

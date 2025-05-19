@@ -133,9 +133,33 @@ public:
     /// Eventual todo: do not hardcode this.
     int dna_states;
     
-    
+    /**
+     * setup the bounds for joint optimization with BFGS
+     */
+    virtual void setBounds(double *lower_bound, double *upper_bound, bool *bound_check);
+
 protected:
-    ModelMarkov *base_model;    
+    ModelMarkov *base_model;
+    
+    /**
+     * This function is served for the multi-dimension
+     * optimization. It should pack the model parameters into a vector
+     * that is index from 1 (NOTE: not from 0)
+     *
+     * @param variables (OUT) Vector of variables, indexed from 1.
+     */
+    virtual void setVariables(double *variables);
+
+    /**
+     * This function is served for the multi-dimension
+     * optimization. It should assign the model parameters from a
+     * vector of variables that is index from 1 (NOTE: not from 0)
+     *
+     * @param variables Vector of variables, indexed from 1.
+     * @return TRUE if parameters are changed, FALSE otherwise (2015-10-20)
+     */
+    virtual bool getVariables(double *variables);
+    
 };
 
 #endif
