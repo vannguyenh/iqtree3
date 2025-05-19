@@ -44,9 +44,9 @@ void ModelGenotype::init_base_model(const char *model_name,
                                     StateFreqType freq_type,
                                     string freq_params) {
     // swap in decoded DNA
-    Alignment* gt_aln = phylo_tree->aln;
-    Alignment* dna_aln = Alignment::decodeGenotypeToDNA(gt_aln);
-    phylo_tree->aln = dna_aln;
+    
+    // Trick ModelDNA constructor by setting the number of states to 4 (DNA).
+    phylo_tree->aln->num_states = n_alleles;
     
     try {
         string model_str = model_name;
@@ -60,16 +60,20 @@ void ModelGenotype::init_base_model(const char *model_name,
         outError(str);
     }
 
-    base_model->init(base_model->freq_type);
+    // Reset the number of states.
+    phylo_tree->aln->num_states = num_states;
     
-    // read any rate-parameter
-    if (! freq_params.empty())
-        base_model->readStateFreq(freq_params);
-    if (! model_params.empty())
-        base_model->readRates(model_params);
-    // reset original genotype alignment
-    phylo_tree->aln = gt_aln;
-    delete dna_aln;
+    // Set reversibility state.
+    is_reversible = base_model->is_reversible;
+    if (!is_reversible)
+        setReversible(is_reversible);
+    
+//    // read any rate-parameter
+//    if (! freq_params.empty())
+//        base_model->readStateFreq(freq_params);
+//    if (! model_params.empty())
+//        base_model->readRates(model_params);
+//    // reset original genotype alignment
 }
 
 string ModelGenotype::getName() {
@@ -101,6 +105,7 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     ASSERT(num_states == 10);
     // Initialise the parameters of GT10 model
     this->freq_type = freq_type;
+    n_alleles = 4;
     
     // Initialise the base model on decoded DNA
     init_base_model(model_name, model_params, freq_type, freq_params);
@@ -137,7 +142,7 @@ void ModelGenotype::startCheckpoint() {
 void ModelGenotype::saveCheckpoint() {
     startCheckpoint();
     base_model->saveCheckpoint();
-    CKP_ARRAY_SAVE(dna_states, base_model->state_freq);
+    CKP_ARRAY_SAVE(n_alleles, base_model->state_freq);
     endCheckpoint();
     ModelMarkov::saveCheckpoint();
 }
@@ -145,7 +150,7 @@ void ModelGenotype::saveCheckpoint() {
 void ModelGenotype::restoreCheckpoint() {
     ModelMarkov::restoreCheckpoint();
     startCheckpoint();
-    CKP_ARRAY_RESTORE(dna_states, base_model->state_freq);
+    CKP_ARRAY_RESTORE(n_alleles, base_model->state_freq);
     base_model->restoreCheckpoint();
     endCheckpoint();
     

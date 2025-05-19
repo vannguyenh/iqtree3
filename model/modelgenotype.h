@@ -133,12 +133,15 @@ public:
     */
     virtual int getNumRateEntries() { return num_states*(num_states); }
     
+    /// Number of nucleotides (alleles).  This might be useful in the
+    /// future, when we do not restrict PoMo to DNA models only.
+    /// Eventual todo: do not hardcode this.
+    int n_alleles;
+    
     
 protected:
     
-    ModelMarkov *base_model;
-    int dna_states;
-    
+    ModelMarkov *base_model;    
 };
 
 #endif
