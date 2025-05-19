@@ -5101,6 +5101,9 @@ void Alignment::getAppearance(StateType state, double *state_app) {
 //        state_app[(pomo_sampled_states[state] >> 16) & 3] = 1.0;
         state_app[convertPomoState(state)] = 1.0;
         break;
+    case SEQ_GENOTYPE:
+        // There are no ambiguous genotype chars
+        break;
 	default: ASSERT(0); break;
 	}
 }

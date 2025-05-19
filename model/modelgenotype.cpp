@@ -32,7 +32,7 @@ ModelGenotype::ModelGenotype(PhyloTree *tree) : ModelMarkov(tree) {
 
 ModelGenotype::ModelGenotype(const char *model_name,
                              string model_params,
-                             StateFreqType freq,
+                             StateFreqType freq_type,
                              string freq_params,
                              PhyloTree *tree)
 : ModelMarkov(tree, true) {
