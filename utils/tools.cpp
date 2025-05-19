@@ -5538,11 +5538,11 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.dating_method = argv[cnt];
                 if (params.dating_method != "LSD"){
                     if (params.dating_method != "mcmctree"){
-                        throw "Currently only LSD (least-square dating) method or MCMCTree method is supported";
-                        continue;
+                        throw "Use --dating LSD or --dating mcmctree";
                     }
 
                 }
+                continue;
             }
 
             if (strcmp(argv[cnt], "--date") == 0) {
