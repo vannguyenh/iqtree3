@@ -167,22 +167,28 @@ void ModelGenotype::computeGenotypeRateMatrix() {
     // step 1: assign the right values into rates array of GT10
     // step 2: computeRateMatrix by using computeRateMatrix function in
     int i, j;
-    // rates has the size n*(n-1)/2
-    for (i = 0; i < num_states; i++) {
-        double *this_rate = &rates[i*num_states];
-        auto [a1, a2] = gt_nt_map[i];
-                
-        for (j = 0; j < num_states; j++) {
-            auto [b1, b2] = gt_nt_map[j];
+    ASSERT(is_reversible && "Genotype model does not work with non-reversible DNA base model yet");
+    // rates has the size n*(n-1)/2 for reversible base DNA models
+    int count = 0;
+    const int base_id[16] = {-1, 0, 1, 2, 0, -1, 3, 4, 1, 3, -1, 5, 2, 4, 5, -1};
+    for (i = 0; i < num_states; i++)
+        for (j = i+1; j < num_states; j++, count++) {
+            double *this_rate = &rates[count];
+            auto a1 = gt_nt_map[i].first;
+            auto a2 = gt_nt_map[i].second;
+            auto b1 = gt_nt_map[j].first;
+            auto b2 = gt_nt_map[j].second;
             if (a1 == b1 && a2 != b2) {
-                if (a2 == 0) this_rate[j] = base_model->rates[b2];
-                else this_rate[j] = base_model->rates[a2+b2];
+                // case 1: identical first base but different 2nd base
+                *this_rate = base_model->rates[base_id[a2*n_alleles+b2]];
             } else if (a1 != b1 && a2 == b2) {
-                if (a1 == 0) this_rate[j] = base_model->rates[b1];
-                else this_rate[j] = base_model->rates[a1+b1];
-            } else this_rate[j] = 0.0;
+                // case 2: different 1st base but identical 2nd base
+                *this_rate = base_model->rates[base_id[a1*n_alleles+b1]];
+            } else {
+                // case 3: both bases are different
+                *this_rate = 0.0;
+            }
         }
-    }
 }
 
 void ModelGenotype::decomposeRateMatrix() {

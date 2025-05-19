@@ -127,11 +127,6 @@ public:
         decompose the rate matrix into eigenvalues and eigenvectors
     */
     virtual void decomposeRateMatrix();
-    /**
-        @return the number of rate entries, equal to the number of non-diagonal elements of the rate matrix
-        since we store full matrix here
-    */
-    virtual int getNumRateEntries() { return num_states*(num_states); }
     
     /// Number of nucleotides (alleles).  This might be useful in the
     /// future, when we do not restrict PoMo to DNA models only.
