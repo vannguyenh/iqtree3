@@ -127,7 +127,12 @@ public:
         decompose the rate matrix into eigenvalues and eigenvectors
     */
     virtual void decomposeRateMatrix();
-    
+
+    /**
+        return the number of dimensions
+    */
+    virtual int getNDim();
+
     /// Number of nucleotides (states).  This might be useful in the
     /// future, when we do not restrict Genotype to DNA models only.
     /// Eventual todo: do not hardcode this.
