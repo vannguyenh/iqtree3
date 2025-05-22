@@ -3282,12 +3282,11 @@ void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
         out.exceptions(ios::failbit | ios::badbit);
         out.open(filename);
 
-        string provide = "basic models";
-        if (iqtree->isSuperTree()) provide = "basic partition structure and models";
-
         // Write Warning
         out << "#nexus" << endl << endl
-            <<"[This MrBayes Block Declaration provides the " << provide << " from the IQTree Run.]" << endl
+            <<"[This MrBayes Block Declaration provides the basic "
+            << (iqtree->isSuperTree() ? "partition structure and models" : "models")
+            << " from the IQTree Run.]" << endl
             << "[Note that MrBayes does not support a large collection of models, so defaults of 'nst=6' for DNA and 'wag' for Protein will be used if a model that does not exist in MrBayes is used.]" << endl
             << "[Furthermore, the Model Parameter '+R' will be replaced by '+G+I'.]" << endl
             << "[This should be used as a Template Only.]" << endl << endl;
@@ -3307,9 +3306,9 @@ void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
         return;
     }
 
-    auto superTree = (PhyloSuperTree*) iqtree;
-    auto saln = (SuperAlignment*) superTree->aln;
-    auto size = superTree->size();
+    auto stree = (PhyloSuperTree*) iqtree;
+    auto saln = (SuperAlignment*) stree->aln;
+    auto size = stree->size();
 
     for (int part = 0; part < size; part++) {
         string name = saln->partitions[part]->name;
@@ -3337,11 +3336,12 @@ void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
 
     // Partition-Specific Model Information
     for (int part = 0; part < size; part++) {
-        PhyloTree* currentTree = superTree->at(part);
+        PhyloTree* curr_tree = stree->at(part);
 
-        out << "  [Subset #" << part + 1 << ": IQTree inferred model " << currentTree->getModelName() << ", ";
-        currentTree->getModel()->printMrBayesModelText(out,
-                convertIntToString(part + 1), saln->partitions[part]->name);
+        out << "  [Subset #" << part + 1 << ": IQTree inferred model " << curr_tree->getModelName() << ", ";
+        curr_tree->getModel()->printMrBayesModelText(out,
+                                                     convertIntToString(part + 1),
+                                                     saln->partitions[part]->name);
         out << endl;
     }
 
@@ -3877,9 +3877,9 @@ void runTreeReconstruction(Params &params, IQTree* &iqtree) {
 
     }
     if (iqtree->isSuperTree()) {
-        auto superTree = (PhyloSuperTree*) iqtree;
-        superTree->computeBranchLengths();
-        superTree->printBestPartitionParams((string(params.out_prefix) + ".best_model.nex").c_str());
+        auto stree = (PhyloSuperTree*) iqtree;
+        stree->computeBranchLengths();
+        stree->printBestPartitionParams((string(params.out_prefix) + ".best_model.nex").c_str());
     }
     if (params.mr_bayes_output) {
         cout << endl << "Writing MrBayes Block Files..." << endl;

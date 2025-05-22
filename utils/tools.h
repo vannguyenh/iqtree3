@@ -3820,7 +3820,7 @@ string getOutputNameWithExt(const InputType& format, const string& output_filepa
 /**
  * ensures a number, to be inputted into MrBayes, is larger than the minimum value for MrBayes (0.01)
  */
-double minValueCheckMrBayes(double origValue);
+double minValueCheckMrBayes(double orig_value);
 
 
 /**

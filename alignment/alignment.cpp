@@ -1881,9 +1881,9 @@ void Alignment::initCodon(char *gene_code_id) {
 		} catch (string &str) {
 			outError("Wrong genetic code ", gene_code_id);
 		}
-		auto codeMap = getGeneticCodeMap();
-		auto found = codeMap.left.find(transl_table);
-		if (found == codeMap.left.end()) {
+		auto code_map = getGeneticCodeMap();
+		auto found = code_map.left.find(transl_table);
+		if (found == code_map.left.end()) {
 			outError("Wrong genetic code ", gene_code_id);
 			return;
 		}

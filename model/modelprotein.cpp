@@ -1168,44 +1168,44 @@ void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string
     RateHeterogeneity* rate = phylo_tree->getRate();
 
     // Get MrBayes Model
-    auto aaModelMap = getIqTreeToMrBayesAAModels();
-    auto iter = aaModelMap.find(name);
-    string mappedModel = "gtr";
+    auto aa_model_map = getIqTreeToMrBayesAAModels();
+    auto iter = aa_model_map.find(name);
+    string mapped_model = "gtr";
 
     // If model is in map, set mappedModel to the value
-    if (iter != aaModelMap.end())
-        mappedModel = iter->second;
+    if (iter != aa_model_map.end())
+        mapped_model = iter->second;
 
-    out << "using MrBayes model " << mappedModel;
+    out << "using MrBayes model " << mapped_model;
 
     // RHAS Specification
     // Free Rate should be substituted by +G+I
-    bool hasGamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
-    bool hasInvariable = rate->getPInvar() != 0.0 || rate->isFreeRate();
-    string rateStr = "equal";
-    if (hasGamma) {
-        if (hasInvariable) {
-            rateStr = "invgamma";
+    bool has_gamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
+    bool has_invariable = rate->getPInvar() != 0.0 || rate->isFreeRate();
+    string rate_str = "equal";
+    if (has_gamma) {
+        if (has_invariable) {
+            rate_str = "invgamma";
             out << "+G+I";
         }
         else {
-            rateStr = "gamma";
+            rate_str = "gamma";
             out << "+G";
         }
-    } else if (hasInvariable) {
-        rateStr = "propinv";
+    } else if (has_invariable) {
+        rate_str = "propinv";
         out << "+I";
     }
 
     out << "]" << endl;
 
     // Lset Parameters
-    out << "  lset applyto=(" << partition << ") nucmodel=protein rates=" << rateStr << ";" << endl;
+    out << "  lset applyto=(" << partition << ") nucmodel=protein rates=" << rate_str << ";" << endl;
 
-    out << "  prset applyto=(" << partition << ")" << " aamodelpr=fixed(" << mappedModel << ")";
+    out << "  prset applyto=(" << partition << ")" << " aamodelpr=fixed(" << mapped_model << ")";
 
     // GTR Customization
-    if (strcmp(mappedModel.c_str(), "gtr") == 0) {
+    if (strcmp(mapped_model.c_str(), "gtr") == 0) {
         // add rate matrix and state frequencies (mandatory for setting gtr values)
         out << " aarevmatpr=";
 

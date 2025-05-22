@@ -8236,15 +8236,15 @@ string getOutputNameWithExt(const InputType& format, const string& output_filepa
     }
 }
 
-double minValueCheckMrBayes(double origValue) {
-     if (origValue < 0.01) {
+double minValueCheckMrBayes(double orig_value) {
+     if (orig_value < 0.01) {
          outWarning("MrBayes does not support values < 0.01! Using 0.01 instead...");
          return 0.01;
      }
-     return origValue;
+     return orig_value;
 }
 
-const unordered_map<string, string> iqTreeToMrBayesAAModels = {
+const unordered_map<string, string> iqtree_to_mr_bayes_aa_models = {
         {"Poisson", "poisson"},
         {"JTT", "jones"},
         {"Dayhoff", "dayhoff"},
@@ -8259,15 +8259,15 @@ const unordered_map<string, string> iqTreeToMrBayesAAModels = {
 };
 
 // Anything outside of index 10 (Code No. 11) is invalid, leave that as empty string
-const string indexedMrBayesGeneticCodes[25] = {"universal", "vertmt", "yeast", "mycoplasma", "invermt",
+const string indexed_mr_bayes_genetic_codes[25] = {"universal", "vertmt", "yeast", "mycoplasma", "invermt",
                                                "ciliate", "", "", "echinoderm", "euplotid", "universal"};
 
 unordered_map<string, string> getIqTreeToMrBayesAAModels() {
-    return iqTreeToMrBayesAAModels;
+    return iqtree_to_mr_bayes_aa_models;
 }
 
 string getMrBayesGeneticCode(int geneticCodeId) {
     if (geneticCodeId == 0) return "";
 
-    return indexedMrBayesGeneticCodes[geneticCodeId - 1];
+    return indexed_mr_bayes_genetic_codes[geneticCodeId - 1];
 }

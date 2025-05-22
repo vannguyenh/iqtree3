@@ -176,11 +176,11 @@ void ModelMorphology::printMrBayesModelText(ofstream& out, string partition, str
     RateHeterogeneity* rate = phylo_tree->getRate();
 
     // Free Rate should be substituted by +G (+I not supported)
-    bool hasGamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
+    bool has_gamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
     bool ordered = strcmp(name.c_str(), "ORDERED") == 0;
 
     // MrBayes' morph model is 'JC-like'
-    out << "using MrBayes model " << (ordered ? "ORDERED" : "JC") << (hasGamma ? "+G" : "") << "]" << endl;
+    out << "using MrBayes model " << (ordered ? "ORDERED" : "JC") << (has_gamma ? "+G" : "") << "]" << endl;
 
     // Warnings
 
@@ -204,7 +204,7 @@ void ModelMorphology::printMrBayesModelText(ofstream& out, string partition, str
     // Lset Parameters
     out << "  lset applyto=(" << partition << ") rates=";
 
-    if (hasGamma) {
+    if (has_gamma) {
         // Rate Categories + Gamma
         out << "gamma";
     } else

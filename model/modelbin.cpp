@@ -79,13 +79,13 @@ string ModelBIN::getNameParams(bool show_fixed_params) {
 
 void ModelBIN::printMrBayesModelText(ofstream& out, string partition, string charset) {
     RateHeterogeneity* rate = phylo_tree->getRate();
-    bool equalFreq = freq_type == FREQ_EQUAL;
+    bool equal_freq = freq_type == FREQ_EQUAL;
 
     // Free Rate should be substituted by +G (+I not supported)
-    bool hasGamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
+    bool has_gamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
 
     // MrBayes's Binary Model is 'F81-like'.
-    out << "using MrBayes model F81" << (hasGamma ? "+G" : "") << (equalFreq ? "+FQ" : "") << "]" << endl;
+    out << "using MrBayes model F81" << (has_gamma ? "+G" : "") << (equal_freq ? "+FQ" : "") << "]" << endl;
     if (rate->isFreeRate() || rate->getPInvar() > 0.0) {
         out << "  [+I modifier ignored, not supported by MrBayes for binary data]" << endl;
         outWarning("MrBayes does not support Invariable Sites with Binary Data! +I has been ignored!");
@@ -93,7 +93,7 @@ void ModelBIN::printMrBayesModelText(ofstream& out, string partition, string cha
 
     // Lset Parameters
     out << "  lset applyto=(" << partition << ") rates=";
-    if (hasGamma) {
+    if (has_gamma) {
         // Rate Categories + Gamma
         out << "gamma";
     } else
@@ -101,6 +101,6 @@ void ModelBIN::printMrBayesModelText(ofstream& out, string partition, string cha
 
     out << ";" << endl;
 
-    if (equalFreq)
+    if (equal_freq)
         out << "  prset applyto=(" << partition << ") statefreqpr=fixed(equal);" << endl;
 }
