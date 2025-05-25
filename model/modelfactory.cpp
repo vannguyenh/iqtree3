@@ -1895,18 +1895,18 @@ void ModelFactory::restorePoMoGenotypeModel(const SeqType& seq_type ,const strin
     }
         
     // +G flag.
-    size_t pomo_rate_start_pos = SEQ_POMO ? rate_str.find("+G") : rate_str.find("+G", p_pos + jump_size);
-    if (pomo_rate_start_pos != string::npos) {
-        string pomo_rate_str = "";
-        size_t pomo_rate_end_pos = rate_str.find_first_of("+*", pomo_rate_start_pos+1);
-        if (pomo_rate_end_pos == string::npos) {
-            pomo_rate_str = rate_str.substr(pomo_rate_start_pos, rate_str.length() - pomo_rate_start_pos);
-            rate_str = rate_str.substr(0, pomo_rate_start_pos);
-            model_str += pomo_rate_str;
+    size_t pomo_gt_rate_start_pos = (seq_type == SEQ_POMO || seq_type == SEQ_GENOTYPE) ? rate_str.find("+G") : rate_str.find("+G", p_pos + jump_size);
+    if (pomo_gt_rate_start_pos != string::npos) {
+        string pomo_gt_rate_str = "";
+        size_t pomo_gt_rate_end_pos = rate_str.find_first_of("+*", pomo_gt_rate_start_pos+1);
+        if (pomo_gt_rate_end_pos == string::npos) {
+            pomo_gt_rate_str = rate_str.substr(pomo_gt_rate_start_pos, rate_str.length() - pomo_gt_rate_start_pos);
+            rate_str = rate_str.substr(0, pomo_gt_rate_start_pos);
+            model_str += pomo_gt_rate_str;
         } else {
-            pomo_rate_str = rate_str.substr(pomo_rate_start_pos, pomo_rate_end_pos - pomo_rate_start_pos);
-            rate_str = rate_str.substr(0, pomo_rate_start_pos) + rate_str.substr(pomo_rate_end_pos);
-            model_str += pomo_rate_str;
+            pomo_gt_rate_str = rate_str.substr(pomo_gt_rate_start_pos, pomo_gt_rate_end_pos - pomo_gt_rate_start_pos);
+            rate_str = rate_str.substr(0, pomo_gt_rate_start_pos) + rate_str.substr(pomo_gt_rate_end_pos);
+            model_str += pomo_gt_rate_str;
         }
     }
         // // +I flag.
