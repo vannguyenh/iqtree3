@@ -331,11 +331,10 @@ protected:
     
     /**
      return the parameters for the PoMo and Genotype models
-     @param[in] seq_type PoMo or Genotype
      @param[in] p_pos model name string
      @param [in|out] rate_str rate string
      @param[out] model_str model string name
      */
-    void restorePoMoGenotypeModel(const SeqType& seq_type, const string::size_type& p_pos, string& rate_str, string& model_str);
+    void processPoMoModelString(string::size_type& p_pos, string& rate_str, string& model_str);
 };
 #endif

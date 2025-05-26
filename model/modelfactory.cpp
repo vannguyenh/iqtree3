@@ -89,22 +89,9 @@ string::size_type posGENOTYPE(const string &name) {
     const string sub2 = "*GT1";
     string::size_type pos1, pos2;
     
-    for (pos1 = 0; pos1 != string::npos; pos1++) {
-        pos1 = name.find(sub1, pos1);
-        if (pos1 == string::npos)
-            break;
-        if (pos1+5 >= name.length() || !isalpha(name[pos1+2])) {
-            break;
-        }
-    }
+    pos1 = name.find(sub1);
     
-    for (pos2 = 0; pos2 != string::npos; pos2++) {
-        pos2 = name.find(sub2, pos2);
-        if (pos2 == string::npos)
-            break;
-        if (pos2+5 >= name.length() ||!isalpha(name[pos2+2]))
-            break;
-    }
+    pos2 = name.find(sub2);
     
     if (pos1 != string::npos && pos2 != string::npos) {
         return min(pos1, pos2);
@@ -293,7 +280,20 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
             model_str = model_str.substr(0, spec_pos);
         }
     }
-    
+
+    // decompose +GT (genotype) from rate_str
+    string genotype_str = "";
+    if ((spec_pos = rate_str.find("+GT")) != string::npos) {
+        size_t end_pos = rate_str.find_first_of("+*", spec_pos+1);
+        if (end_pos == string::npos) {
+            genotype_str += rate_str.substr(spec_pos);
+            rate_str = rate_str.substr(0, spec_pos);
+        } else {
+            genotype_str += rate_str.substr(spec_pos, end_pos - spec_pos);
+            rate_str = rate_str.substr(0, spec_pos) + rate_str.substr(end_pos);
+        }
+    }
+
     // decompose +F from rate_str
     string freq_str = "";
     while ((spec_pos = rate_str.find("+F")) != string::npos) {
@@ -414,28 +414,28 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
     }
 
     // In case of PoMo, check that only supported flags are given.
-    if (pomo || genotype) {
+    if (pomo) {
         if (rate_str.find("+ASC") != string::npos)
             // TODO DS: This is an important feature, because then,
             // PoMo can be applied to SNP data only.
-            outError("PoMo/Genotype do not yet support ascertainment bias correction (+ASC).");
+            outError("PoMo does not yet support ascertainment bias correction (+ASC).");
         if (posRateFree(rate_str) != string::npos)
-            outError("PoMo/Genotype do not yet support free rate models (+R).");
+            outError("PoMo does not yet support free rate models (+R).");
         if (rate_str.find("+FMIX") != string::npos)
-            outError("PoMo/Genotype do not yet support frequency mixture models (+FMIX).");
+            outError("PoMo does not yet support frequency mixture models (+FMIX).");
         if (posRateHeterotachy(rate_str) != string::npos)
-            outError("PoMo/Genotype do not yet support heterotachy models (+H).");
+            outError("PoMo does not yet support heterotachy models (+H).");
     }
 
-    // PoMo or Genotype. The +P{}, +GXX and +I flags are interpreted during model creation.
+    // PoMo. The +P{}, +GXX and +I flags are interpreted during model creation.
     // This is necessary for compatibility with mixture models. If there is no
     // mixture model, move +P{}, +GXX and +I flags to model string. For mixture
     // models, the heterozygosity can be set separately for each model and the
     // +P{}, +GXX and +I flags should already be inside the model definition.
-    if (model_str.substr(0, 3) != "MIX" && (pomo || genotype)) {
-        // +P{} flag or +GT flag.
-        string::size_type tmp_pos = pomo ? posPOMO(rate_str) : posGENOTYPE(rate_str);
-        restorePoMoGenotypeModel((pomo? SEQ_POMO : SEQ_GENOTYPE), tmp_pos, rate_str, model_str);
+    if (model_str.substr(0, 3) != "MIX" && (pomo)) {
+        // +P{} flag.
+        string::size_type tmp_pos = posPOMO(rate_str);
+        processPoMoModelString(tmp_pos, rate_str, model_str);
     }
 
     //    nxsmodel = models_block->findModel(model_str);
@@ -1870,57 +1870,54 @@ bool ModelFactory::getVariables(double *variables) {
     return changed;
 }
 
-void ModelFactory::restorePoMoGenotypeModel(const SeqType& seq_type ,const string::size_type& p_pos, string& rate_str, string& model_str) {
-    ASSERT(seq_type == SEQ_POMO || seq_type == SEQ_GENOTYPE);
-    // jump size = 2 (+P) for Pomo or jump size = 5 (+GT1X) for Genotype
-    const string::size_type jump_size = seq_type == SEQ_POMO ? 2 : 5;
-        
+void ModelFactory::processPoMoModelString(string::size_type& p_pos, string& rate_str, string& model_str) {
+    // +P{} flag.
+    p_pos = posPOMO(rate_str);
     if (p_pos != string::npos) {
-        // extract +P or +GT1X
-        const string model_flag_name = rate_str.substr(p_pos, jump_size);
-        
-        if (rate_str[p_pos+jump_size] == '{') {
-            string::size_type close_bracket = rate_str.find("}");
-            if (close_bracket == string::npos)
-                outError("No closing bracket in PoMo/Genotype parameters.");
-            else {
-                string pomo_heterozygosity = rate_str.substr(p_pos+jump_size+1,close_bracket-p_pos-jump_size-1);
-                rate_str = rate_str.substr(0, p_pos) + rate_str.substr(close_bracket+1);
-                model_str += model_flag_name + "{" + pomo_heterozygosity + "}";
-            }
-        } else {
-            rate_str = rate_str.substr(0, p_pos) + rate_str.substr(p_pos + jump_size);
-            model_str += model_flag_name;
+      if (rate_str[p_pos+2] == '{') {
+        string::size_type close_bracket = rate_str.find("}");
+        if (close_bracket == string::npos)
+          outError("No closing bracket in PoMo parameters.");
+        else {
+          string pomo_heterozygosity = rate_str.substr(p_pos+3,close_bracket-p_pos-3);
+          rate_str = rate_str.substr(0, p_pos) + rate_str.substr(close_bracket+1);
+          model_str += "+P{" + pomo_heterozygosity + "}";
         }
+      }
+      else {
+        rate_str = rate_str.substr(0, p_pos) + rate_str.substr(p_pos + 2);
+        model_str += "+P";
+      }
     }
-        
+
     // +G flag.
-    size_t pomo_gt_rate_start_pos = (seq_type == SEQ_POMO || seq_type == SEQ_GENOTYPE) ? rate_str.find("+G") : rate_str.find("+G", p_pos + jump_size);
-    if (pomo_gt_rate_start_pos != string::npos) {
-        string pomo_gt_rate_str = "";
-        size_t pomo_gt_rate_end_pos = rate_str.find_first_of("+*", pomo_gt_rate_start_pos+1);
-        if (pomo_gt_rate_end_pos == string::npos) {
-            pomo_gt_rate_str = rate_str.substr(pomo_gt_rate_start_pos, rate_str.length() - pomo_gt_rate_start_pos);
-            rate_str = rate_str.substr(0, pomo_gt_rate_start_pos);
-            model_str += pomo_gt_rate_str;
-        } else {
-            pomo_gt_rate_str = rate_str.substr(pomo_gt_rate_start_pos, pomo_gt_rate_end_pos - pomo_gt_rate_start_pos);
-            rate_str = rate_str.substr(0, pomo_gt_rate_start_pos) + rate_str.substr(pomo_gt_rate_end_pos);
-            model_str += pomo_gt_rate_str;
-        }
+    size_t pomo_rate_start_pos;
+    if ((pomo_rate_start_pos = rate_str.find("+G")) != string::npos) {
+      string pomo_rate_str = "";
+      size_t pomo_rate_end_pos = rate_str.find_first_of("+*", pomo_rate_start_pos+1);
+      if (pomo_rate_end_pos == string::npos) {
+        pomo_rate_str = rate_str.substr(pomo_rate_start_pos, rate_str.length() - pomo_rate_start_pos);
+        rate_str = rate_str.substr(0, pomo_rate_start_pos);
+        model_str += pomo_rate_str;
+      } else {
+        pomo_rate_str = rate_str.substr(pomo_rate_start_pos, pomo_rate_end_pos - pomo_rate_start_pos);
+        rate_str = rate_str.substr(0, pomo_rate_start_pos) + rate_str.substr(pomo_rate_end_pos);
+        model_str += pomo_rate_str;
+      }
     }
-        // // +I flag.
-        // size_t pomo_irate_start_pos;
-        // if ((pomo_irate_start_pos = rate_str.find("+I")) != string::npos) {
-        //   string pomo_irate_str = "";
-        //   size_t pomo_irate_end_pos = rate_str.find_first_of("+*", pomo_irate_start_pos+1);
-        //   if (pomo_irate_end_pos == string::npos) {
-        //     pomo_irate_str = rate_str.substr(pomo_irate_start_pos, rate_str.length() - pomo_irate_start_pos);
-        //     rate_str = rate_str.substr(0, pomo_irate_start_pos);
-        //     model_str += pomo_irate_str;
-        //   } else {
-        //     pomo_irate_str = rate_str.substr(pomo_irate_start_pos, pomo_irate_end_pos - pomo_irate_start_pos);
-        //     rate_str = rate_str.substr(0, pomo_irate_start_pos) + rate_str.substr(pomo_irate_end_pos);
-        //     model_str += pomo_irate_str;
-        //   }
+
+    // // +I flag.
+    // size_t pomo_irate_start_pos;
+    // if ((pomo_irate_start_pos = rate_str.find("+I")) != string::npos) {
+    //   string pomo_irate_str = "";
+    //   size_t pomo_irate_end_pos = rate_str.find_first_of("+*", pomo_irate_start_pos+1);
+    //   if (pomo_irate_end_pos == string::npos) {
+    //     pomo_irate_str = rate_str.substr(pomo_irate_start_pos, rate_str.length() - pomo_irate_start_pos);
+    //     rate_str = rate_str.substr(0, pomo_irate_start_pos);
+    //     model_str += pomo_irate_str;
+    //   } else {
+    //     pomo_irate_str = rate_str.substr(pomo_irate_start_pos, pomo_irate_end_pos - pomo_irate_start_pos);
+    //     rate_str = rate_str.substr(0, pomo_irate_start_pos) + rate_str.substr(pomo_irate_end_pos);
+    //     model_str += pomo_irate_str;
+    //   }
 }
