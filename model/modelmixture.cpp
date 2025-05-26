@@ -1054,7 +1054,7 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
     pomo = (p_pos != string::npos);
     
     if (pomo) {
-        parsePoMoGenotypeModel(SEQ_POMO, p_pos, model_str, pomo_heterozygosity, pomo_rate_str);
+        parsePoMoModel(p_pos, model_str, pomo_heterozygosity, pomo_rate_str);
     }
     
     // Parse model for genotypes.
@@ -1062,18 +1062,6 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
     string genotype_subrates = "";
     string::size_type gt_pos = posGENOTYPE(model_str);
     // if the model contains +/*GT -> extract Genotype models
-    if (gt_pos != string::npos) {
-        if (gt_pos == string::npos)
-            outError("For genotype data, the model name (" + model_str + ") must contain +GT. ");
-        else {
-            // Parse model parameters
-            parsePoMoGenotypeModel(SEQ_GENOTYPE, gt_pos, model_str, genotype_subrates, genotype_rate_str);
-            
-            // For now, we ignore the genotype_subrates
-            if (genotype_subrates != "")
-                outWarning("Ignore {" + genotype_subrates + "}");
-        }
-    }
 
     // sequencing error model
     string seqerr = "";
@@ -2690,26 +2678,22 @@ bool ModelMixture::rescale_codon_mix() {
 }
 
 
-void parsePoMoGenotypeModel(const SeqType& seq_type, const string::size_type& p_pos, string& model_str, string& pomo_heterozygosity, string& pomo_rate_str) {
-    ASSERT(seq_type == SEQ_POMO || seq_type == SEQ_GENOTYPE);
-    // jump size = 2 (+P) for Pomo or jump size = 5 (+GT1X) for Genotype
-    const string::size_type jump_size = seq_type == SEQ_POMO ? 2 : 5;
-    
-    if (model_str[p_pos+jump_size] == '{') {
+void parsePoMoModel(const string::size_type& p_pos, string& model_str, string& pomo_heterozygosity, string& pomo_rate_str) {
+    if (model_str[p_pos+2] == '{') {
         string::size_type close_bracket = model_str.find("}", p_pos);
         if (close_bracket == string::npos) {
             cout << "Model string: " << model_str << endl;
             outError("No closing bracket in PoMo parameters.");
         }
         else {
-            pomo_heterozygosity = model_str.substr(p_pos+jump_size+1,close_bracket-p_pos-jump_size-1);
+            pomo_heterozygosity = model_str.substr(p_pos+3,close_bracket-p_pos-3);
             model_str = model_str.substr(0, p_pos) + model_str.substr(close_bracket+1);
         }
     }
     else {
-        model_str = model_str.substr(0, p_pos) + model_str.substr(p_pos + jump_size);
+        model_str = model_str.substr(0, p_pos) + model_str.substr(p_pos + 2);
     }
-    
+
     size_t pomo_rate_start_pos;
     if ((pomo_rate_start_pos = model_str.find("+G")) != string::npos) {
         size_t pomo_rate_end_pos = model_str.find_first_of("+*", pomo_rate_start_pos+1);

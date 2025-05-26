@@ -31,14 +31,13 @@ ModelSubst *createModel(string model_str, ModelsBlock *models_block,
                         PhyloTree *tree);
 
 /**
- * parse parameters for PoMo or Genotype models
- * @param[in] seq_type type of sequences
+ * parse parameters for PoMo models
  * @param[in] p_pos position of +P or +GT
  * @param[in/out] model_str full name of the model
  * @param[out] pomo_heterozygosity heterozygousity of Pomo model
  * @param[out] pomo_rate_str stirng of rate heterogeneity
  */
-void parsePoMoGenotypeModel(const SeqType& seq_type, const string::size_type& p_pos, string& model_str, string& pomo_heterozygosity, string& pomo_rate_str);
+void parsePoMoModel(const string::size_type& p_pos, string& model_str, string& pomo_heterozygosity, string& pomo_rate_str);
 
 /**
  * mixture model
