@@ -39,21 +39,19 @@ ModelGenotype::ModelGenotype(const char *model_name,
 	init(model_name, model_params, freq_type, freq_params);
 }
 
-void ModelGenotype::init_base_model(const char *model_name,
+void ModelGenotype::init_base_model(const char *base_model_name,
                                     string model_params,
                                     StateFreqType freq_type,
                                     string freq_params) {
-    // swap in decoded DNA
-    
     // Trick ModelDNA constructor by setting the number of states to 4 (DNA).
     phylo_tree->aln->num_states = dna_states;
     
     try {
-        string model_str = model_name;
-        if (ModelMarkov::validModelName(model_str))
-            base_model = ModelMarkov::getModelByName(model_str, phylo_tree, model_params, freq_type, freq_params);
+        string base_model_str = base_model_name;
+        if (ModelMarkov::validModelName(base_model_str))
+            base_model = ModelMarkov::getModelByName(base_model_str, phylo_tree, model_params, freq_type, freq_params);
         else
-            base_model = new ModelDNA(model_name, model_params, freq_type, freq_params, phylo_tree);
+            base_model = new ModelDNA(base_model_name, model_params, freq_type, freq_params, phylo_tree);
     }
     catch (string str) {
         cout << "Error during initilisation of the base model of Gentoype. " << endl;
@@ -67,13 +65,6 @@ void ModelGenotype::init_base_model(const char *model_name,
     is_reversible = base_model->is_reversible;
     if (!is_reversible)
         setReversible(is_reversible);
-    
-//    // read any rate-parameter
-//    if (! freq_params.empty())
-//        base_model->readStateFreq(freq_params);
-//    if (! model_params.empty())
-//        base_model->readRates(model_params);
-//    // reset original genotype alignment
 }
 
 string ModelGenotype::getName() {
@@ -102,24 +93,26 @@ void ModelGenotype::init_genotype_frequencies() {
 
 void ModelGenotype::init(const char *model_name, string model_params, StateFreqType freq_type, string freq_params)
 {
-    ASSERT(num_states == 10);
+    const char *plus = std::strchr(model_name, '+');
+    
+    if (! plus) {
+        outError("Genotype model is not well defined. No base model and genotype model are defined.");
+    }
+    
+    std::string base_model_name(model_name, plus - model_name);
+    std::string gt_model_name(plus + 1);
+
+    ASSERT(num_states == std::stoi(gt_model_name.substr(2)));
     // Initialise the parameters of GT10 model
     dna_states = 4;
     
     // Initialise the base model on decoded DNA
-    init_base_model(model_name, model_params, freq_type, freq_params);
-    this->name = base_model->getName();
-    
+    init_base_model(base_model_name.c_str(), model_params, freq_type, freq_params);
     cout << "Initialised base genotype model of :"  << endl;
-    cout << "Model name: " << this->name << endl;
+    cout << "Model name: " << base_model->getName() << endl;
     
     // compute and install the GT10 frequencies
     init_genotype_frequencies();
-    cout << "Base model rates (after init): ";
-    for (int i = 0; i < 6; i++) {
-        cout << base_model->rates[i] << " ";
-    }
-    cout << endl;
 }
 
 
@@ -159,10 +152,6 @@ void ModelGenotype::restoreCheckpoint() {
 }
 
 void ModelGenotype::computeGenotypeRateMatrix() {
-    // TODO: assign the right value into the rate matrix of GT10
-    
-    // step 1: assign the right values into rates array of GT10
-    // step 2: computeRateMatrix by using computeRateMatrix function in
     int i, j;
     ASSERT(is_reversible && "Genotype model does not work with non-reversible DNA base model yet");
     // rates has the size n*(n-1)/2 for reversible base DNA models

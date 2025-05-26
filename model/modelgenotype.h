@@ -42,7 +42,7 @@ public:
         - allocateds rates[getNumRateEntries()] = rates[n*n(n-1)/2];
         - allocates eigenvalues and eigenvectors.
      
-		@param model_name model name, e.g., JC, HKY.
+		@param model_name model name, e.g., JC, HKY,etc. + GT10, GT16
         @param model_params The parameters of the model (user defined models).
 		@param freq_type
         @param freq_params
@@ -74,7 +74,7 @@ public:
      The idea is to use the machinery of the underlying Markov model to extract nucleotide exchangeabilities parameters
      and introduce an additional layer that adds genotype frequencies
      */
-    void init_base_model(const char *model_name,
+    void init_base_model(const char *base_model_name,
                          string model_params,
                          StateFreqType freq_type,
                          string freq_params);
@@ -142,7 +142,7 @@ public:
      * setup the bounds for joint optimization with BFGS
      */
     virtual void setBounds(double *lower_bound, double *upper_bound, bool *bound_check);
-
+    
 protected:
     ModelMarkov *base_model;
     

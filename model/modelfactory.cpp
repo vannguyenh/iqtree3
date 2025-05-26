@@ -292,7 +292,7 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
             genotype_str += rate_str.substr(spec_pos, end_pos - spec_pos);
             rate_str = rate_str.substr(0, spec_pos) + rate_str.substr(end_pos);
         }
-        //model_str = model_str + genotype_str;
+        model_str = model_str + genotype_str;
     }
 
     // decompose +F from rate_str
