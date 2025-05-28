@@ -106,7 +106,7 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     // Initialise the parameters of GT10 model
     dna_states = 4;
     
-    // Initialise the base model on decoded DNA
+    // Initialise the base model
     init_base_model(base_model_name.c_str(), model_params, freq_type, freq_params);
     cout << "Initialised base genotype model of :"  << endl;
     cout << "Model name: " << base_model->getName() << endl;
