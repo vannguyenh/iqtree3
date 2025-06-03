@@ -87,18 +87,23 @@ string::size_type posPOMO(string &model_name) {
 string::size_type posGENOTYPE(const string &name) {
     const string sub1 = "+GT1";
     const string sub2 = "*GT1";
-    string::size_type pos1, pos2;
+    const string sub3 =  "GT1";
+
+    string::size_type pos1, pos2, pos3;
     
     pos1 = name.find(sub1);
-    
+
     pos2 = name.find(sub2);
-    
-    if (pos1 != string::npos && pos2 != string::npos) {
+    pos3 = name.find(sub3);
+
+    if (pos1 != string::npos && pos2 != string::npos && pos3 != string::npos) {
         return min(pos1, pos2);
     } else if (pos1 != string::npos)
         return pos1;
-    else
+    else if (pos2 != string::npos)
         return pos2;
+    else
+        return pos3;
 }
 
 ModelsBlock *readModelsDefinition(Params &params) {
@@ -176,6 +181,7 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
     syncChkPoint = nullptr;
     string model_str = model_name;
     string rate_str;
+    string subrate;
 
     try {
 
@@ -264,7 +270,7 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
     if ((gt_pos == string::npos) &&
         (tree->aln->seq_type == SEQ_GENOTYPE))
         outError("Provided alignment is exclusively used by Genotype but model string does not contain, e.g., \"+GT\".");
-        
+
     // Decompose model string into model_str and rate_str string.
     size_t spec_pos = model_str.find_first_of("{+*");
     if (spec_pos != string::npos) {
@@ -273,11 +279,19 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
             size_t pos = findCloseBracket(model_str, spec_pos);
             if (pos == string::npos)
                 outError("Model name has wrong bracket notation '{...}'");
+
             rate_str = model_str.substr(pos+1);
             model_str = model_str.substr(0, pos+1);
+            subrate = model_str.substr(spec_pos, pos);
+
+            if (gt_pos == 0)
+                model_str = "GTR" + subrate + "+" + model_str.substr(gt_pos, 4);
         } else {
             rate_str = model_str.substr(spec_pos);
             model_str = model_str.substr(0, spec_pos);
+
+            if (gt_pos == 0)
+                model_str = "GTR+" + model_str;
         }
     }
 
