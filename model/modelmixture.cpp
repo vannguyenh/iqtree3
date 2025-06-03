@@ -1058,11 +1058,17 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
     }
     
     // Parse model for genotypes.
+    bool genotype = false;
     string genotype_rate_str = "";
     string genotype_subrates = "";
+    string model_genotype = "";
     string::size_type gt_pos = posGENOTYPE(model_str);
-    // if the model contains +/*GT -> extract Genotype models
-
+    genotype = (gt_pos != string::npos);
+    // if the model contains +GT1* -> extract Genotype models
+    if (genotype) {
+        model_genotype = model_str.substr(gt_pos);
+        model_str = model_str.substr(0, gt_pos);
+    }
     // sequencing error model
     string seqerr = "";
     string::size_type spec_pos;
@@ -1081,7 +1087,7 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
     if (!seqerr.empty() && tree->aln->seq_type != SEQ_DNA) {
         outError("Sequencing error model " + seqerr + " is only supported for DNA");
     }
-    // Now that PoMo stuff has been removed, check for model parameters.
+    // Now that PoMo/Genotype stuff has been removed, check for model parameters.
 	size_t pos = model_str.find(OPEN_BRACKET);
     if (pos != string::npos) {
 		if (model_str.rfind(CLOSE_BRACKET) != model_str.length()-1)
@@ -1116,6 +1122,10 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
             freq_params = tmp_str.substr(0, end_pos);
         }
     }
+
+    // Genotype model: After extracting GTR parameters, convert the right name for the Genotype model
+    if (genotype)
+        model_str = model_str + model_genotype;
 
 	/*
 	if ((model_str == "JC" && tree->aln->seq_type == SEQ_DNA) ||
@@ -1163,7 +1173,7 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
         if (genotype_rate_str == "")
             model = new ModelGenotype(model_str.c_str(), model_params, freq_type, freq_params, tree);
         else
-            outError("Sorry! We have not supported rate heterogeneity modl for gentoype type.");
+            outError("Sorry! We have not supported rate heterogeneity model for genotype type.");
     } else {
 		outError("Unsupported model type");
 	}
