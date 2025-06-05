@@ -260,7 +260,6 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
         (tree->aln->seq_type == SEQ_POMO))
         outError("Provided alignment is exclusively used by PoMo but model string does not contain, e.g., \"+P\".");
 
-        
     // Detect Genotype and throw error if sequence type is Genotype but +GT is
     // not given. This makes the model string cleaner and
     // compareable.
@@ -272,6 +271,7 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
         outError("Provided alignment is exclusively used by Genotype but model string does not contain, e.g., \"+GT\".");
 
     // Decompose model string into model_str and rate_str string.
+    // Extra for genotype model which requires to format GT10{...} into GTR{...}+GT10
     size_t spec_pos = model_str.find_first_of("{+*");
     if (spec_pos != string::npos) {
         if (model_str[spec_pos] == '{') {
@@ -280,20 +280,21 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
             if (pos == string::npos)
                 outError("Model name has wrong bracket notation '{...}'");
 
-            rate_str = model_str.substr(pos+1);
-            model_str = model_str.substr(0, pos+1);
+            rate_str = model_str.substr(pos + 1);
+            model_str = model_str.substr(0, pos + 1);
             subrate = model_str.substr(spec_pos, pos);
 
             if (gt_pos == 0)
                 model_str = "GTR" + subrate + "+" + model_str.substr(gt_pos, 4);
-        } else {
+        } else { // there is no subrate, but other cases like +G+I etc.
             rate_str = model_str.substr(spec_pos);
             model_str = model_str.substr(0, spec_pos);
-
             if (gt_pos == 0)
                 model_str = "GTR+" + model_str;
         }
-    }
+    } else if (gt_pos == 0) //there is no subrate or rate
+        model_str = "GTR+" + model_str;
+
 
     // decompose +GT (genotype) from rate_str
     string genotype_str = "";
