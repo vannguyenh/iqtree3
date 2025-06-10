@@ -166,14 +166,20 @@ void ModelGenotype::computeGenotypeRateMatrix() {
             auto b1 = gt_nt_map[j].first;
             auto b2 = gt_nt_map[j].second;
             if (a1 == b1 && a2 != b2) {
-                // case 1: identical first base but different 2nd base
+                // case 1: identical 1st bases but different 2nd bases
                 *this_rate = base_model->rates[base_id[a2*dna_states+b2]];
             } else if (a1 != b1 && a2 == b2) {
-                // case 2: different 1st base but identical 2nd base
+                // case 2: different 1st bases but identical 2nd bases
                 *this_rate = base_model->rates[base_id[a1*dna_states+b1]];
+            } else if ( (a1 == b2 && a2 != b1) && num_states == 10) {
+                // case 3: unphased genotype, first and second base on different alelle are identical
+                *this_rate = base_model->rates[base_id[a2*dna_states+b1]];
+            } else if ( (a2 == b1 && a1 != b2) && num_states == 10) {
+                // case 4: unphased genotype, second and first base on different allele are identical
+                *this_rate = base_model->rates[base_id[a1*dna_states+b2]];
             } else {
-                // case 3: both bases are different
-                *this_rate = 0.0;
+                // case 5: both bases are different -- applied for both phased and unphased genotypes
+                *this_rate = 0.605749;
             }
         }
 }
