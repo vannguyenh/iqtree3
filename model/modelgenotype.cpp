@@ -156,7 +156,7 @@ void ModelGenotype::computeGenotypeRateMatrix() {
     ASSERT(is_reversible && "Genotype model does not work with non-reversible DNA base model yet");
     // rates has the size n*(n-1)/2 for reversible base DNA models
     int count = 0;
-    // decode the exchangebilities between 2 nucleotides in gentoype 
+    // decode the exchangebilities between 2 nucleotides in genotype
     const int base_id[16] = {-1, 0, 1, 2, 0, -1, 3, 4, 1, 3, -1, 5, 2, 4, 5, -1};
     for (i = 0; i < num_states; i++)
         for (j = i+1; j < num_states; j++, count++) {
@@ -167,19 +167,19 @@ void ModelGenotype::computeGenotypeRateMatrix() {
             auto b2 = gt_nt_map[j].second;
             if (a1 == b1 && a2 != b2) {
                 // case 1: identical 1st bases but different 2nd bases
-                *this_rate = base_model->rates[base_id[a2*dna_states+b2]];
+                *this_rate = base_model->rates[base_id[a2 * dna_states + b2]];
             } else if (a1 != b1 && a2 == b2) {
                 // case 2: different 1st bases but identical 2nd bases
-                *this_rate = base_model->rates[base_id[a1*dna_states+b1]];
-            } else if ( (a1 == b2 && a2 != b1) && num_states == 10) {
+                *this_rate = base_model->rates[base_id[a1 * dna_states + b1]];
+            } else if ((a1 == b2 && a2 != b1) && num_states == 10) {
                 // case 3: unphased genotype, first and second base on different alelle are identical
-                *this_rate = base_model->rates[base_id[a2*dna_states+b1]];
-            } else if ( (a2 == b1 && a1 != b2) && num_states == 10) {
+                *this_rate = base_model->rates[base_id[a2 * dna_states + b1]];
+            } else if ((a2 == b1 && a1 != b2) && num_states == 10) {
                 // case 4: unphased genotype, second and first base on different allele are identical
-                *this_rate = base_model->rates[base_id[a1*dna_states+b2]];
+                *this_rate = base_model->rates[base_id[a1 * dna_states + b2]];
             } else {
                 // case 5: both bases are different -- applied for both phased and unphased genotypes
-                *this_rate = 0.605749;
+                *this_rate = 0.0;
             }
         }
 }
