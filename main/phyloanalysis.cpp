@@ -585,10 +585,13 @@ void reportModel(ostream &out, Alignment *aln, ModelSubst *m) {
 
     ASSERT(aln->num_states == m->num_states);
     double *rate_mat = new double[m->num_states * m->num_states];
+    double f_mat[m->num_states * m->num_states];
     if (!m->isSiteSpecificModel())
         m->getRateMatrix(rate_mat);
+
     else
-        ((ModelSet*)m)->front()->getRateMatrix(rate_mat);
+        ((ModelSet *) m)->front()->getRateMatrix(rate_mat);
+
 
     if (m->num_states <= 4 || aln->seq_type == SEQ_GENOTYPE) {
         out << "Rate parameter R:" << endl << endl;
@@ -603,6 +606,22 @@ void reportModel(ostream &out, Alignment *aln, ModelSubst *m) {
                     else if (k % 5 == 4)
                         out << endl;
                 }
+            for (i = 0, k = 0; i < m->num_states - 1; i++)
+                for (j = i + 1; j < m->num_states; j++, k++) {
+                    f_mat[i*m->num_states+j] = rate_mat[k];
+                    f_mat[j*m->num_states+i] = rate_mat[k];
+                }
+            if (aln->seq_type == SEQ_GENOTYPE) {
+                out << "Full symmetric rate matrix" << endl << endl;
+                for (i = 0; i < m->num_states; i++) {
+                    for (j = 0; j < m->num_states; j++)
+                        if (i != j)
+                            out << " " << f_mat[i * m->num_states + j];
+                        else
+                            out << " " << "-----";
+                    out << endl;
+                }
+            }
 
         } else { // non-reversible model
             for (i = 0, k = 0; i < m->num_states; i++)
@@ -616,7 +635,14 @@ void reportModel(ostream &out, Alignment *aln, ModelSubst *m) {
                             out << endl;
                         k++;
                     }
+        }
 
+        m->getQMatrix(f_mat);
+        out << "Full Q matrix and state frequencies (can be used as input for IQ-TREE): " << endl << endl;
+        for (i = 0; i < m->num_states; i++) {
+            for (j = 0; j < m->num_states; j++)
+                out << " " << f_mat[i*m->num_states+j];
+            out << endl;
         }
 
         //if (tree.aln->num_states > 4)
