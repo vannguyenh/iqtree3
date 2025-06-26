@@ -630,6 +630,11 @@ private:
 public:
 
     /**
+     * Assign the default values to the variables
+     */
+    void setDefault();
+    
+    /**
     *  Fast and accurate optimiation for alpha and p_invar
     */
     bool fai;
@@ -1648,6 +1653,9 @@ public:
 
     /** TRUE to optimize mixture model weights */
     bool optimize_mixmodel_weight;
+
+    /** TRUE to optimize mixture model nucleotide/amino acide frequency */
+    bool optimize_mixmodel_freq;
 
     /** number of mixture branch lengths, default 1 */
     int num_mixlen;
@@ -2857,6 +2865,11 @@ public:
     * Whether to output a MrBayes Block File
     */
     bool mr_bayes_output;
+    
+    /**
+     *  input tree string (instead of a file)
+     */
+    string intree_str;
 };
 
 /**
