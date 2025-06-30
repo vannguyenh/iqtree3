@@ -1634,10 +1634,10 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
         if (num_alpha < 10) // two few occurences to decide
             return SEQ_UNKNOWN;
         if (num_nuc == num_alpha) {
-            if ((double)num_proper_nuc / num_alpha > 0.9) {
-                return SEQ_DNA;
-            } else if ((num_proper_nuc+num_di_nuc) == num_alpha) {
+            if ((num_proper_nuc+num_di_nuc) == num_alpha) {
                 return SEQ_GENOTYPE;
+            } else if ((double)num_proper_nuc / num_alpha > 0.9) {
+                return SEQ_DNA;
             } else {
                 return SEQ_UNKNOWN;
             }
@@ -2076,6 +2076,7 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
     codon_table = NULL;
     genetic_code = NULL;
     non_stop_codon = NULL;
+    Params params = Params::getInstance();
 
     if (nseq != seq_names.size()) {
         throw "Different number of sequences than specified";
@@ -2142,7 +2143,11 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
             break;
         case SEQ_GENOTYPE:
             // TODO: genotype num_state
-            num_states = 10;
+            if (params.model_name.find("GT10") != string::npos) {
+                num_states = 10;
+            } else if (params.model_name.find("GT16") != string::npos) {
+                num_states = 16;
+            }
             cout << "Alignment most likely contains genotype matrix" << endl;
             break;
 
@@ -2160,7 +2165,11 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
             num_states = 4;
             user_seq_type = SEQ_DNA;
         } else if (strcmp(sequence_type, "GT") == 0) {
-            num_states = 10;
+            if (params.model_name.find("GT10") != string::npos) {
+                num_states = 10;
+            } else if (params.model_name.find("GT16") != string::npos) {
+                num_states = 16;
+            }
             user_seq_type = SEQ_GENOTYPE;
         } else if (strcmp(sequence_type, "AA") == 0 || strcmp(sequence_type, "PROT") == 0) {
             num_states = 20;

@@ -23,7 +23,8 @@
 #include "modelmarkov.h"
 #include "modeldna.h"
 
-static const vector<pair<int,int> > gt_nt_map = { {0,0}, {1,1}, {2,2}, {3,3}, {0,1}, {0,2}, {0,3}, {1,2}, {1,3}, {2,3} };
+static const vector<pair<int,int> > gt_nt_map = { {0,0}, {1,1}, {2,2}, {3,3}, {0,1}, {0,2}, {0,3}, {1,2}, {1,3}, {2,3}};
+// GT16: , {1,0}, {2,0}, {3,0}, {2,1}, {3,1}, {3,2}
 
 /**
 Model for genotype matrix data

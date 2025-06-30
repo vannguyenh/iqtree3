@@ -103,15 +103,13 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     std::string gt_model_name(plus + 1);
 
     ASSERT(num_states == std::stoi(gt_model_name.substr(2)));
-    // Initialise the parameters of GT10 model
+    // Initialise the parameters of genotype model
     dna_states = 4;
-    
     // Initialise the base model
     init_base_model(base_model_name.c_str(), model_params, freq_type, freq_params);
     cout << "Initialised base genotype model of :"  << endl;
     cout << "Model name: " << base_model->getName() << endl;
-    
-    // compute and install the GT10 frequencies
+    // compute and install the genotype frequencies
     init_genotype_frequencies();
 }
 
