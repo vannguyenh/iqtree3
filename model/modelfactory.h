@@ -304,29 +304,29 @@ public:
     
     /**
      compute the mixture-based log-likelihood for mAIC, mAICc, mBIC calculation.
-     @param warning the warning message when mixture-based log-likelihood calculation is skipped.
      */
-    virtual double computeMixLh(string &warning) {return 0.0;}
-    
+    virtual double computeMarginalLh() {return 0.0;}
+
 protected:
-    
-    /**
-     this function is served for the multi-dimension optimization. It should pack the model parameters
-     into a vector that is index from 1 (NOTE: not from 0)
-     @param variables (OUT) vector of variables, indexed from 1
-     */
-    virtual void setVariables(double *variables);
-    
-    /**
-     this function is served for the multi-dimension optimization. It should assign the model parameters
-     from a vector of variables that is index from 1 (NOTE: not from 0)
-     @param variables vector of variables, indexed from 1
-     @return TRUE if parameters are changed, FALSE otherwise (2015-10-20)
-     */
-    virtual bool getVariables(double *variables);
-    
+
+	/**
+		this function is served for the multi-dimension optimization. It should pack the model parameters
+		into a vector that is index from 1 (NOTE: not from 0)
+		@param variables (OUT) vector of variables, indexed from 1
+	*/
+	virtual void setVariables(double *variables);
+
+	/**
+		this function is served for the multi-dimension optimization. It should assign the model parameters
+		from a vector of variables that is index from 1 (NOTE: not from 0)
+		@param variables vector of variables, indexed from 1
+		@return TRUE if parameters are changed, FALSE otherwise (2015-10-20)
+	*/
+	virtual bool getVariables(double *variables);
+
     vector<double> optimizeGammaInvWithInitValue(int fixed_len, double logl_epsilon, double gradient_epsilon,
-                                                 double initPInv, double initAlpha, DoubleVector &lenvec, Checkpoint *model_ckp);
+                                       double initPInv, double initAlpha, DoubleVector &lenvec, Checkpoint *model_ckp);
+    
     
     
     /**
