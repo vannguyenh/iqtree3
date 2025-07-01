@@ -1166,6 +1166,7 @@ void ModelProtein::computeTipLikelihood(PML::StateType state, double *state_lk) 
 
 void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string charset) {
     RateHeterogeneity* rate = phylo_tree->getRate();
+    bool equal_freq = (freq_type == FREQ_EQUAL);
 
     // Get MrBayes Model
     auto aa_model_map = getIqTreeToMrBayesAAModels();
@@ -1177,6 +1178,9 @@ void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string
         mapped_model = iter->second;
 
     out << "using MrBayes model " << mapped_model;
+
+    if (equal_freq)
+        out << "+FQ";
 
     // RHAS Specification
     // Free Rate should be substituted by +G+I
@@ -1204,6 +1208,10 @@ void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string
 
     out << "  prset applyto=(" << partition << ")" << " aamodelpr=fixed(" << mapped_model << ")";
 
+    if (equal_freq)
+        out << " statefreqpr=fixed(equal)";
+
+    /*
     // GTR Customization
     if (strcmp(mapped_model.c_str(), "gtr") == 0) {
         // add rate matrix and state frequencies (mandatory for setting gtr values)
@@ -1230,6 +1238,7 @@ void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string
         }
         out << ")";
     }
+    */
 
     out << ";";
 }

@@ -566,7 +566,7 @@ void ModelDNA::setVariables(double *variables) {
 }
 
 void ModelDNA::printMrBayesModelText(ofstream& out, string partition, string charset) {
-    bool equal_freq = freq_type == FREQ_EQUAL;
+    bool equal_freq = (freq_type == FREQ_EQUAL);
     short nst = 6;
     string model_name = "GTR";
     RateHeterogeneity* rate = phylo_tree->getRate();

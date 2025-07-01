@@ -3379,11 +3379,11 @@ void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
 
     // Partition Type Settings
     if (params.partition_type != TOPO_UNLINKED) {
-        out << "unlink statefreq=(all) revmat=(all) shape=(all) pinvar=(all) tratio=(all);" << endl;
+        out << "  unlink statefreq=(all) revmat=(all) shape=(all) pinvar=(all) tratio=(all);" << endl;
         if (params.partition_type != BRLEN_FIX) {
-            out << "prset applyto=(all) ratepr=variable;" << endl;
+            out << "  prset applyto=(all) ratepr=variable;" << endl;
             if (params.partition_type != BRLEN_SCALE) {
-                out << "unlink brlens=(all);" << endl;
+                out << "  unlink brlens=(all);" << endl;
             }
         }
     }

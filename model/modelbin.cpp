@@ -79,7 +79,7 @@ string ModelBIN::getNameParams(bool show_fixed_params) {
 
 void ModelBIN::printMrBayesModelText(ofstream& out, string partition, string charset) {
     RateHeterogeneity* rate = phylo_tree->getRate();
-    bool equal_freq = freq_type == FREQ_EQUAL;
+    bool equal_freq = (freq_type == FREQ_EQUAL);
 
     // Free Rate should be substituted by +G (+I not supported)
     bool has_gamma = rate->getGammaShape() != 0.0 || rate->isFreeRate();
