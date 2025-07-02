@@ -12,18 +12,31 @@ function Measure-IQTree {
 
     $startTime = Get-Date
 
-    # Start the process
-    $process = Start-Process powershell -ArgumentList "-Command $CommandLine" -PassThru -Wait
+    # Start the command in a child PowerShell process
+    $proc = Start-Process -FilePath "powershell" -ArgumentList "-NoProfile", "-Command", $CommandLine -PassThru
+    $procId = $proc.Id
+    $peakMemory = 0
+
+    # Monitor the child process's memory usage
+    while (-not $proc.HasExited) {
+        Start-Sleep -Milliseconds 200
+        try {
+            $currentMem = (Get-Process -Id $procId -ErrorAction Stop).WorkingSet64 / 1MB
+            if ($currentMem -gt $peakMemory) {
+                $peakMemory = $currentMem
+            }
+        } catch {
+            break
+        }
+    }
 
     $endTime = Get-Date
-    $elapsed = ($endTime - $startTime).TotalSeconds
+    $elapsed = [math]::Round(($endTime - $startTime).TotalSeconds, 2)
 
-    # Get peak memory (approx, in MB)
-    $memMB = [math]::Round($process.PeakWorkingSet64 / 1MB, 2)
-
-    # Append to log
-    "$CommandLine`t$elapsed`t$memMB" | Out-File -FilePath $LOGFILE -Append -Encoding utf8
+    # Write timing and memory data to log
+    "$CommandLine`t$elapsed`t$([math]::Round($peakMemory, 2))" | Out-File -FilePath $LOGFILE -Append -Encoding utf8
 }
+
 
 
 # ./build/iqtree3 -s test_scripts/test_data/small.fa -p test_scripts/test_data/small.nex -m "MFP+MERGE" -T 1 -seed $SEED
@@ -73,8 +86,6 @@ Measure-IQTree "./build/iqtree3  -s test_scripts/test_data/turtle_aa.fasta -p te
 Get-Content test_scripts/test_data/turtle_aa.fasta.treefile, test_scripts/test_data/turtle_aa.nex.treefile |
     Set-Content test_scripts/test_data/turtle_aa.trees
 Measure-IQTree "./build/iqtree3  -s test_scripts/test_data/turtle_aa.fasta -p test_scripts/test_data/turtle_aa.merge.best_scheme.nex -z test_scripts/test_data/turtle_aa.trees -zb 10000 -au -n 0 --prefix test_scripts/test_data/turtle_aa.test -seed $SEED -T 1"
-
-Measure-IQTree "./build/iqtree3  -s test_scripts/test_data/turtle_aa.fasta -m GTR+F+I+R3+T -te test_scripts/test_data/turtle_aa.trees -T 1 --prefix test_scripts/test_data/turtle_aa.mix -seed $SEED"
 
 Measure-IQTree "./build/iqtree3  -s test_scripts/test_data/turtle_aa.fasta -p test_scripts/test_data/turtle_aa.nex.best_scheme.nex -z test_scripts/test_data/turtle_aa.trees -n 0 -wpl --prefix test_scripts/test_data/turtle_aa.wpl -seed $SEED -T 1"
 

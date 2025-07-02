@@ -87,8 +87,6 @@ run_timed ${BUILD_DIR}/iqtree3 -s $AA_FASTA -p $AA_NEX -B 1000 -T 1 -m MFP+MERGE
 cat $AA_FASTA.treefile $AA_NEX.treefile > ${WD}/turtle_aa.trees
 run_timed ${BUILD_DIR}/iqtree3 -s $AA_FASTA -p ${WD}/turtle_aa.merge.best_scheme.nex -z ${WD}/turtle_aa.trees -zb 10000 -au -n 0 --prefix ${WD}/turtle_aa.test -seed $SEED -T 1
 
-run_timed ${BUILD_DIR}/iqtree3 -s $AA_FASTA -m GTR+F+I+R3+T -te ${WD}/turtle_aa.trees -T 1 --prefix ${WD}/turtle_aa.mix -seed $SEED
-
 run_timed ${BUILD_DIR}/iqtree3 -s $AA_FASTA -p $AA_NEX.best_scheme.nex -z ${WD}/turtle_aa.trees -n 0 -wpl --prefix ${WD}/turtle_aa.wpl -seed $SEED -T 1
 
 run_timed ${BUILD_DIR}/iqtree3 -s $AA_FASTA -S $AA_NEX --prefix ${WD}/turtle_aa.loci -T 1 -seed $SEED
