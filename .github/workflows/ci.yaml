@@ -70,14 +70,6 @@ jobs:
         run: |
           chmod +x test_scripts/test_iqtree.sh
           ./test_scripts/test_iqtree.sh
-          
-      - name: Upload timing log
-        if: always()  # ensures it uploads even if previous steps fail
-        uses: actions/upload-artifact@v4
-        with:
-          name: time-log-linux-${{ matrix.gcc-version }}
-          path: time_log.tsv
-
 
       - name: Run verify_results.sh
         run: |
@@ -125,13 +117,6 @@ jobs:
           chmod +x test_scripts/test_iqtree.sh
           ./test_scripts/test_iqtree.sh
 
-      - name: Upload timing log
-        if: always()  # ensures it uploads even if previous steps fail
-        uses: actions/upload-artifact@v4
-        with:
-          name: time-log-Linux-AArch64
-          path: time_log.tsv
-
       - name: Run verify_results.sh
         run: |
           chmod +x test_scripts/verify_results.sh
@@ -141,6 +126,11 @@ jobs:
         run: |
           chmod +x test_scripts/verify_runtime.sh
           ./test_scripts/verify_runtime.sh 6
+
+      - name: Run verify_memory.sh
+        run: |
+          chmod +x test_scripts/verify_memory.sh
+          ./test_scripts/verify_memory.sh 6
 
   compile-linux-universal:
     name: Linux Universal
@@ -217,13 +207,6 @@ jobs:
           chmod +x test_scripts/test_iqtree.sh
           ./test_scripts/test_iqtree.sh
 
-      - name: Upload timing log
-        if: always()  # ensures it uploads even if previous steps fail
-        uses: actions/upload-artifact@v4
-        with:
-          name: time-log-Mac-x86-64
-          path: time_log.tsv
-
       - name: Run verify_results.sh
         run: |
           chmod +x test_scripts/verify_results.sh
@@ -271,13 +254,6 @@ jobs:
         run: |
           chmod +x test_scripts/test_iqtree.sh
           ./test_scripts/test_iqtree.sh
-
-      - name: Upload timing log
-        if: always()  # ensures it uploads even if previous steps fail
-        uses: actions/upload-artifact@v4
-        with:
-          name: time-log-Mac-Arm
-          path: time_log.tsv
 
       - name: Run verify_results.sh
         run: |
@@ -390,13 +366,6 @@ jobs:
         shell: pwsh
         run: |
           ./test_scripts/test_iqtree.ps1
-
-      - name: Upload timing log
-        if: always()  # ensures it uploads even if previous steps fail
-        uses: actions/upload-artifact@v4
-        with:
-          name: time-log-Windows-x86-64
-          path: time_log.tsv
 
       - name: Run verify_results.ps1
         shell: pwsh
