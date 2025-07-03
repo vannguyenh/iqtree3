@@ -30,7 +30,7 @@ while IFS=$'\t' read -r command threshold expected reported; do
     else
         echo "✅ $command passed the memory check."
         diff=$(echo "$reported - $expected" | bc -l)
-        echo -e "$command\t$expected\t$threshold\t$reported\t$diff"
+        echo "Expected: $expected MB, Threshold: $threshold MB, Reported: $reported MB"
     fi
 done < <(tail -n +2 "$final_file")
 

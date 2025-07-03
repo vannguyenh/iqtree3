@@ -391,3 +391,7 @@ jobs:
         shell: pwsh
         run: |
           ./test_scripts/verify_runtime.ps1
+
+      - name: Run verify_memory.sh
+        run: |
+          ./test_scripts/verify_memory.ps1
