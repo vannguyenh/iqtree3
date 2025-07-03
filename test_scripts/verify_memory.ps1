@@ -1,5 +1,5 @@
 param (
-    [int]   $ExpectedColumn = 7
+    [int]   $ExpectedColumn = 8
 )
 
 $WD = "test_scripts/test_data"
