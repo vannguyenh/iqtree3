@@ -12,12 +12,18 @@ function Measure-IQTree {
 
     $startTime = Get-Date
 
-    # Start the command in a child PowerShell process
-    $proc = Start-Process -FilePath "powershell" -ArgumentList "-NoProfile", "-Command", $CommandLine -PassThru
+    # Split command and arguments
+    $exe, $args = $CommandLine -split '\s+', 2
+    $tempOut = [System.IO.Path]::GetTempFileName()
+
+    # Start the process with output redirection
+    $proc = Start-Process -FilePath $exe -ArgumentList $args `
+        -RedirectStandardOutput $tempOut `
+        -NoNewWindow -PassThru
+
     $procId = $proc.Id
     $peakMemory = 0
 
-    # Monitor the child process's memory usage
     while (-not $proc.HasExited) {
         Start-Sleep -Milliseconds 200
         try {
@@ -33,8 +39,14 @@ function Measure-IQTree {
     $endTime = Get-Date
     $elapsed = [math]::Round(($endTime - $startTime).TotalSeconds, 2)
 
-    # Write timing and memory data to log
+    # Show output
+    Get-Content $tempOut
+
+    # Log timing and memory
     "$CommandLine`t$elapsed`t$([math]::Round($peakMemory, 2))" | Out-File -FilePath $LOGFILE -Append -Encoding utf8
+
+    # Cleanup
+    Remove-Item $tempOut
 }
 
 
