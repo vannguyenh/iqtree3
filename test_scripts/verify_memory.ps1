@@ -1,5 +1,5 @@
 param (
-    [int]$ExpectedColumn  # 3 = ExpectedMemory or Runtime
+    [int]   $ExpectedColumn = 7
 )
 
 $WD = "test_scripts/test_data"
