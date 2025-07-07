@@ -15,8 +15,6 @@ paste "$selected_columns_file" /tmp/reported_column.tsv > "$final_file"
 
 fail_count=0
 
-echo -e "Command\tExpected\tThreshold\tActual\tExceededBy"
-
 # Skip header
 while IFS=$'\t' read -r command threshold expected reported; do
     allowed=$(echo "$expected + $threshold" | bc -l)
@@ -25,12 +23,12 @@ while IFS=$'\t' read -r command threshold expected reported; do
     if [ "$is_exceed" = "1" ]; then
         diff=$(echo "$reported - $expected" | bc -l)
         echo "❌ $command exceeded the allowed memory usage."
-        echo "Expected: $expected MB, Threshold: $threshold MB, Reported: $reported MB"
+        echo "Expected: $expected MB, Threshold: $threshold MB, Reported: $reported MB, Difference: $diff MB"
         ((fail_count++))
     else
         echo "✅ $command passed the memory check."
         diff=$(echo "$reported - $expected" | bc -l)
-        echo "Expected: $expected MB, Threshold: $threshold MB, Reported: $reported MB"
+        echo "Expected: $expected MB, Threshold: $threshold MB, Reported: $reported MB, Difference: $diff MB"
     fi
 done < <(tail -n +2 "$final_file")
 

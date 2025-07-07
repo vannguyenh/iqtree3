@@ -33,7 +33,6 @@ for ($i = 0; $i -lt $selectedColumns.Count; $i++) {
 $combinedLines | Set-Content $finalFile
 
 # Now compare
-Write-Host "`nCommand`tExpected`tThreshold`tActual`tExceededBy"
 $failCount = 0
 $finalLines = Get-Content $finalFile
 
