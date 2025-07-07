@@ -25,13 +25,13 @@ jobs:
             cmake-version: 3.14.7
             upload: true
             runtime-arg: 4
-            memory-arg: 3
+            memory-arg: Linux-gcc-9
           # Latest supported gcc and cmake versions
           - gcc-version: 12
             cmake-version: latest
             upload: false
             runtime-arg: 5
-            memory-arg: 4
+            memory-arg: Linux-gcc-12
 
     steps:
       - name: Checkout
@@ -137,7 +137,7 @@ jobs:
       - name: Run verify_memory.sh
         run: |
           chmod +x test_scripts/verify_memory.sh
-          ./test_scripts/verify_memory.sh 5
+          ./test_scripts/verify_memory.sh Linux-aarch64
 
   compile-linux-universal:
     name: Linux Universal
@@ -227,7 +227,7 @@ jobs:
       - name: Run verify_memory.sh
         run: |
           chmod +x test_scripts/verify_memory.sh
-          ./test_scripts/verify_memory.sh 6
+          ./test_scripts/verify_memory.sh mac-os-x86-64
 
   build-macos-arm:
     name: Mac OS ARM64
@@ -280,7 +280,7 @@ jobs:
       - name: Run verify_memory.sh
         run: |
           chmod +x test_scripts/verify_memory.sh
-          ./test_scripts/verify_memory.sh 7
+          ./test_scripts/verify_memory.sh mac-os-arm64
 
   compile-mac-universal:
     name: Mac OS Universal
@@ -394,6 +394,6 @@ jobs:
         run: |
           ./test_scripts/verify_runtime.ps1
 
-      - name: Run verify_memory.sh
+      - name: Run verify_memory.ps1
         run: |
           ./test_scripts/verify_memory.ps1

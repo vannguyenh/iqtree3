@@ -5,7 +5,17 @@ WD="test_scripts/test_data"
 input_file="${WD}/expected_memory.tsv"
 reported_file="time_log.tsv"
 selected_columns_file="${WD}/selected_columns.tsv"
-cut -f1,2,"$expected_column" "$input_file" > "${selected_columns_file}"
+
+# Get the column index (1-based) of the expected column name
+col_index=$(head -1 "$input_file" | tr '\t' '\n' | awk -v col="$expected_column" '{if ($0 == col) print NR}')
+
+# Check if column was found
+if [[ -z "$col_index" ]]; then
+  echo "Column '$expected_column' not found in $input_file"
+  exit 1
+fi
+
+cut -f1,2,"$col_index" "$input_file" > "${selected_columns_file}"
 final_file="${WD}/combined_with_reported.tsv"
 
 # assuming the reported file and expected file have the same order of commands
