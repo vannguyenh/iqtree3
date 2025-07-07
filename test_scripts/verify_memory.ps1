@@ -1,5 +1,5 @@
 param (
-    [int]   $ExpectedColumn = 8
+    [string] $ExpectedColumnName = "windows-x86"
 )
 
 $WD = "test_scripts/test_data"
@@ -9,11 +9,21 @@ $selectedColumnsFile = Join-Path $WD "selected_columns.tsv"
 $reportedColumnFile = "$env:TEMP\reported_column.tsv"
 $finalFile = Join-Path $WD "combined_with_reported.tsv"
 
-# Read expected: Command, Threshold, ExpectedColumn
+# Get the header and find the index of the expected column name
+$header = Get-Content $expectedFile -TotalCount 1
+$columns = $header -split "`t"
+$columnIndex = $columns.IndexOf($ExpectedColumnName)
+
+if ($columnIndex -lt 0) {
+    Write-Error "Column '$ExpectedColumnName' not found in $expectedFile"
+    exit 1
+}
+
+# Adjust to 0-based indexing for arrays
 $expectedLines = Get-Content $expectedFile | Select-Object -Skip 1
 $selectedColumns = foreach ($line in $expectedLines) {
     $parts = $line -split "`t"
-    "$($parts[0])`t$($parts[1])`t$($parts[$ExpectedColumn - 1])"
+    "$($parts[0])`t$($parts[1])`t$($parts[$columnIndex])"
 }
 $selectedColumns | Set-Content $selectedColumnsFile
 
@@ -59,7 +69,7 @@ foreach ($line in $finalLines) {
 Write-Host ""
 
 if ($failCount -eq 0) {
-    Write-Host "✅ All runtime/memory checks passed."
+    Write-Host "✅ All memory checks passed."
     exit 0
 } else {
     Write-Host "❌ $failCount checks failed."

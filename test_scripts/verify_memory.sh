@@ -43,7 +43,7 @@ while IFS=$'\t' read -r command threshold expected reported; do
 done < <(tail -n +2 "$final_file")
 
 if [ "$fail_count" -eq 0 ]; then
-    echo "✅ All runtime checks passed."
+    echo "✅ All memory checks passed."
 else
     echo "❌ $fail_count checks failed."
     exit 1

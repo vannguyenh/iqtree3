@@ -24,13 +24,13 @@ jobs:
           - gcc-version: 9
             cmake-version: 3.14.7
             upload: true
-            runtime-arg: 4
+            runtime-arg: Linux-gcc-9
             memory-arg: Linux-gcc-9
           # Latest supported gcc and cmake versions
           - gcc-version: 12
             cmake-version: latest
             upload: false
-            runtime-arg: 5
+            runtime-arg: Linux-gcc-12
             memory-arg: Linux-gcc-12
 
     steps:
@@ -132,7 +132,7 @@ jobs:
       - name: Run verify_runtimes.sh
         run: |
           chmod +x test_scripts/verify_runtime.sh
-          ./test_scripts/verify_runtime.sh 6
+          ./test_scripts/verify_runtime.sh Linux-aarch64
 
       - name: Run verify_memory.sh
         run: |
@@ -222,7 +222,7 @@ jobs:
       - name: Run verify_runtimes.sh
         run: |
           chmod +x test_scripts/verify_runtime.sh
-          ./test_scripts/verify_runtime.sh 7
+          ./test_scripts/verify_runtime.sh mac-os-x86-64
 
       - name: Run verify_memory.sh
         run: |
@@ -275,7 +275,7 @@ jobs:
       - name: Run verify_runtimes.sh
         run: |
           chmod +x test_scripts/verify_runtime.sh
-          ./test_scripts/verify_runtime.sh 8
+          ./test_scripts/verify_runtime.sh mac-os-arm64
 
       - name: Run verify_memory.sh
         run: |
