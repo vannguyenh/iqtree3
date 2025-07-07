@@ -20,8 +20,10 @@ cut -f1,2,"$col_index" "$input_file" > "${selected_columns_file}"
 final_file="${WD}/combined_with_reported.tsv"
 
 # assuming the reported file and expected file have the same order of commands
-cut -f3 "$reported_file" > /tmp/reported_column.tsv
-paste "$selected_columns_file" /tmp/reported_column.tsv > "$final_file"
+temp_reported_column=$(mktemp)
+cut -f3 "$reported_file" > "$temp_reported_column"
+paste "$selected_columns_file" "$temp_reported_column" > "$final_file"
+rm -f "$temp_reported_column"
 
 
 fail_count=0
