@@ -1,4 +1,5 @@
 #!/bin/bash
+# expect the first argument to be the column name : contain what platform(OS) is running the script
 expected_column="$1"
 
 WD="test_scripts/test_data"
