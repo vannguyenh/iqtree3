@@ -84,8 +84,14 @@ public:
         \brief Initialise state frequencies
         Use the machinery of the base model for nucleotides A C G T. 
      */
-    void init_genotype_frequencies();
-    
+    void init_genotype_frequencies(string freq_params);
+
+    /**
+     * compute the frequencies of A C G T for the base model with 4 states
+     * @param freq_params
+     */
+    virtual string compute_freq_params_base_model(string freq_params);
+
     /**
      @return model name
      */

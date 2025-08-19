@@ -25,6 +25,10 @@
 #include <string.h>
 
 #include <Eigen/Dense>
+#include <sstream>
+#include <string>
+#include <vector>
+
 
 ModelGenotype::ModelGenotype(PhyloTree *tree) : ModelMarkov(tree) {
     
@@ -45,16 +49,16 @@ void ModelGenotype::init_base_model(const char *base_model_name,
                                     string freq_params) {
     // Trick ModelDNA constructor by setting the number of states to 4 (DNA).
     phylo_tree->aln->num_states = dna_states;
-    
+    string freq_params_base_model = compute_freq_params_base_model(freq_params);
     try {
         string base_model_str = base_model_name;
         if (ModelMarkov::validModelName(base_model_str))
-            base_model = ModelMarkov::getModelByName(base_model_str, phylo_tree, model_params, freq_type, freq_params);
+            base_model = ModelMarkov::getModelByName(base_model_str, phylo_tree, model_params, freq_type, freq_params_base_model);
         else
-            base_model = new ModelDNA(base_model_name, model_params, freq_type, freq_params, phylo_tree);
+            base_model = new ModelDNA(base_model_name, model_params, freq_type, freq_params_base_model, phylo_tree);
     }
     catch (string str) {
-        cout << "Error during initilisation of the base model of Gentoype. " << endl;
+        cout << "Error during initialisation of the base model of Genotype. " << endl;
         outError(str);
     }
 
@@ -71,7 +75,7 @@ string ModelGenotype::getName() {
     return this->name;
 }
 
-void ModelGenotype::init_genotype_frequencies() {
+void ModelGenotype::init_genotype_frequencies(string freq_params) {
     // this one is not base model, it should be defined as GT10
     freq_type = base_model->freq_type;
     switch (freq_type) {
@@ -81,6 +85,10 @@ void ModelGenotype::init_genotype_frequencies() {
             break;
         case FREQ_EMPIRICAL: //'+F'
         case FREQ_ESTIMATE:
+        case FREQ_USER_DEFINED:
+            for (int i=0; i < num_states; i++)
+                state_freq[i] = freq_params[i];
+            break;
         case FREQ_UNKNOWN:
             phylo_tree->aln->computeStateFreq(state_freq);
             break;
@@ -91,6 +99,42 @@ void ModelGenotype::init_genotype_frequencies() {
     ModelMarkov::setStateFrequency(state_freq);
 }
 
+string ModelGenotype::compute_freq_params_base_model(string freq_params) {
+
+    std::vector<double> freq_prams_base_model(4, 0.0);
+    std::vector<double> freq_params_vector;
+
+    // Wrap string in a stream for getline
+    std::istringstream iss(freq_params);
+    std::string val;
+    char delimiter = ',';
+    while (std::getline(iss, val, delimiter)) {
+        if (!val.empty()) {
+            freq_params_vector.push_back(std::stod(val));
+        }
+    }
+
+    for (int pos=0; pos < freq_params_vector.size(); pos++) {
+        auto i = gt_nt_map[pos].first;
+        auto j = gt_nt_map[pos].second;
+
+        if (i == j) {
+            freq_prams_base_model[i] += freq_params_vector[pos];
+        } else {
+            freq_prams_base_model[i] += freq_params_vector[pos] / 2.0;
+        }
+    }
+    // turn the vector into a string
+    // Convert vector to comma-separated string
+    std::ostringstream oss;
+    for (std::size_t k = 0; k < freq_prams_base_model.size(); ++k) {
+        oss << freq_prams_base_model[k];
+        if (k + 1 < freq_prams_base_model.size()) {
+            oss << ",";
+        }
+    }
+    return oss.str();
+}
 void ModelGenotype::init(const char *model_name, string model_params, StateFreqType freq_type, string freq_params)
 {
     const char *plus = std::strchr(model_name, '+');
@@ -110,7 +154,7 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     cout << "Initialised base genotype model of :"  << endl;
     cout << "Model name: " << base_model->getName() << endl;
     // compute and install the genotype frequencies
-    init_genotype_frequencies();
+    init_genotype_frequencies(freq_params);
 }
 
 
