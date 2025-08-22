@@ -3295,6 +3295,7 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
             outError("Number of threads must be 1 for sequential version.");
         }
     #endif
+        cout << endl;
         
         if(insertion_size_distribution != nullptr && strcmp(insertion_size_distribution, "") != 0)
             params.alisim_insertion_distribution = parseIndelDis(insertion_size_distribution, "Insertion");
