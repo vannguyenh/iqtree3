@@ -3171,7 +3171,7 @@ extern "C" StringResult version() {
 // num_threads -- the number of threads
 // insertion_size_distribution -- the insertion size distribution
 // deletion_size_distribution -- the deletion size distribution
-extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst_model, int seed, StringArray& partition_info, const char* partition_type, int seq_length, double insertion_rate, double deletion_rate, const char* root_seq, int num_threads, const char* insertion_size_distribution, const char* deletion_size_distribution) {
+extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst_model, int seed, const char* partition_info, const char* partition_type, int seq_length, double insertion_rate, double deletion_rate, const char* root_seq, int num_threads, const char* insertion_size_distribution, const char* deletion_size_distribution) {
     
     // verbose_mode
     // extern VerboseMode verbose_mode;
@@ -3191,6 +3191,7 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
         params.multi_rstreams_used = true;
         params.alisim_output_filename = "AliSimAlignment";
         params.out_prefix = "AliSimTrees.nwk";
+        params.aln_output_format = IN_FASTA;
         params.ran_seed = seed;
         init_random(params.ran_seed);
         // initialize multiple random streams if needed
@@ -3218,7 +3219,7 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
         
         params.model_name = subst_model;
         
-        if((partition_type == nullptr || strcmp(partition_type, "") == 0) && partition_info.length > 0)
+        if((partition_type == nullptr || strcmp(partition_type, "") == 0) && (partition_info && partition_info[0] != '\0'))
             outError("When partition info is provided, partition type must be provided.");
         else if(partition_type != nullptr && strcmp(partition_type, "") != 0) {
             if(strcmp(partition_type, "equal") == 0) {
@@ -3236,11 +3237,7 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
             ofstream partition_info_file(params.partition_file);
             if (!partition_info_file.is_open())
                 outError("Failed to create or open the partition info file for writing.");
-            for (int i = 0; i < partition_info.length; i++) {
-                if (partition_info.strings[i] == nullptr)
-                    outError("Encountered null string pointer in partition_info.strings.");
-                partition_info_file << partition_info.strings[i] << endl;
-            }
+            partition_info_file << partition_info << std::endl;
             partition_info_file.close();
         }
         
@@ -3308,7 +3305,7 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
         ostringstream yamlss;
         string line;
         yamlss << "alignment: |" << endl;
-        ifstream in_alignment("AliSimAlignment.phy");
+        ifstream in_alignment("AliSimAlignment.fa");
         if (!in_alignment)
             outError("Failed to open the alignment file.");
         while (safeGetline(in_alignment, line))
