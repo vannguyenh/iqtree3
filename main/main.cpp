@@ -3191,6 +3191,7 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
         params.multi_rstreams_used = true;
         params.alisim_output_filename = "AliSimAlignment";
         params.out_prefix = "AliSimTrees.nwk";
+        params.ran_seed = seed;
         init_random(params.ran_seed);
         // initialize multiple random streams if needed
         if (params.multi_rstreams_used)
@@ -3216,8 +3217,6 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
         trees_file.close();
         
         params.model_name = subst_model;
-        
-        params.ran_seed = seed;
         
         if((partition_type == nullptr || strcmp(partition_type, "") == 0) && partition_info.length > 0)
             outError("When partition info is provided, partition type must be provided.");
