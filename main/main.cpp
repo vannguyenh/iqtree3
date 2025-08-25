@@ -3159,7 +3159,7 @@ extern "C" StringResult version() {
 
 // Execute AliSim Simulation
 // output: results in YAML format that contains the simulated alignment and the content of the log file
-// trees -- array of NEWICK tree strings (multiple trees)
+// tree -- the NEWICK tree string
 // subst_model -- the substitution model name
 // seed -- the random seed
 // partition_info -- partition information
@@ -3172,7 +3172,7 @@ extern "C" StringResult version() {
 // insertion_size_distribution -- the insertion size distribution
 // deletion_size_distribution -- the deletion size distribution
 // population_size -- the population size
-extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst_model, int seed, const char* partition_info, const char* partition_type, int seq_length, double insertion_rate, double deletion_rate, const char* root_seq, int num_threads, const char* insertion_size_distribution, const char* deletion_size_distribution, int population_size) {
+extern "C" StringResult simulate_alignment(const char* tree, const char* subst_model, int seed, const char* partition_info, const char* partition_type, int seq_length, double insertion_rate, double deletion_rate, const char* root_seq, int num_threads, const char* insertion_size_distribution, const char* deletion_size_distribution, int population_size) {
     
     // verbose_mode
     // extern VerboseMode verbose_mode;
@@ -3222,14 +3222,9 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
         ofstream trees_file(params.user_file);
         if (!trees_file.is_open())
             outError("Failed to create or open the trees file for writing.");
-        for (int i = 0; i < trees.length; i++) {
-            if (trees.strings[i] == nullptr)
-                outError("Encountered null string pointer in trees.strings.");
-            trees_file << trees.strings[i];
-            if(strlen(trees.strings[i]) > 0 && trees.strings[i][strlen(trees.strings[i]) - 1] != ';')
-                trees_file << ";";
-            trees_file << endl;
-        }
+        if (!tree || tree[0] == '\0')
+            outError("The input tree is null.");
+        trees_file << tree << endl;
         trees_file.close();
         
         params.model_name = subst_model;

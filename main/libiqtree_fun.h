@@ -124,7 +124,7 @@ extern "C" StringResult version();
 /*
  * Execute AliSim Simulation
  * output: results in YAML format that contains the simulated alignment and the content of the log file
- * trees -- array of NEWICK tree strings (multiple trees)
+ * tree -- the NEWICK tree string
  * subst_model -- the substitution model name
  * seed -- the random seed
  * partition_info -- partition information
@@ -138,6 +138,6 @@ extern "C" StringResult version();
  * deletion_size_distribution -- the deletion size distribution
  * population_size -- the population size
  */
-extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst_model, int seed, const char* partition_info = "", const char* partition_type = "", int seq_length = 1000, double insertion_rate = 0, double deletion_rate = 0, const char* root_seq = "", int num_threads = 1, const char* insertion_size_distribution = "", const char* deletion_size_distribution = "", int population_size = -1);
+extern "C" StringResult simulate_alignment(const char* tree, const char* subst_model, int seed, const char* partition_info = "", const char* partition_type = "", int seq_length = 1000, double insertion_rate = 0, double deletion_rate = 0, const char* root_seq = "", int num_threads = 1, const char* insertion_size_distribution = "", const char* deletion_size_distribution = "", int population_size = -1);
 
 #endif /* LIBIQTREE2_FUN */
