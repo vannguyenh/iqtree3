@@ -2566,6 +2566,11 @@ public:
     bool alisim_no_copy_gaps;
     
     /**
+    *  TRUE if users have specified the random seed
+    */
+    bool seed_specified;
+    
+    /**
     *  original parameters
     */
     string original_params;

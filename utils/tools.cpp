@@ -1559,6 +1559,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.ran_seed = (tv.tv_usec);
     params.subsampling_seed = params.ran_seed;
     params.subsampling = 0;
+    params.seed_specified = false;
     
     params.suppress_list_of_sequences = false;
     params.suppress_zero_distance_warnings = false;
@@ -2149,6 +2150,7 @@ void parseArg(int argc, char *argv[], Params &params) {
 				if (cnt >= argc)
 					throw "Use -seed <random_seed>";
 				params.ran_seed = abs(convert_int(argv[cnt]));
+                params.seed_specified = true;
 				continue;
 			}
 			if (strcmp(argv[cnt], "-pdgain") == 0) {
@@ -6073,6 +6075,10 @@ void parseArg(int argc, char *argv[], Params &params) {
     if (params.alisim_active && (params.tree_freq_file || params.site_freq_file))
         outError("Sorry! `-ft` (--site-freq) and `-fs` (--tree-freq) options are not fully supported in AliSim. However, AliSim can estimate posterior mean frequencies from the alignment. Please try again without `-ft` and `-fs` options!");
     
+    // Users have to specify a random seed to run AliSim
+    if (params.alisim_active && !params.seed_specified)
+        outError("To make the simulation reproducible, please specify a random seed via `-seed <NUM>`");
+    
     // set default filename for the random tree if AliSim is running in Random mode
     if (params.alisim_active && !params.user_file && params.tree_gen != NONE)
     {
@@ -7931,6 +7937,7 @@ void Params::setDefault() {
     ran_seed = (tv.tv_usec);
     subsampling_seed = ran_seed;
     subsampling = 0;
+    seed_specified = false;
     
     suppress_list_of_sequences = false;
     suppress_zero_distance_warnings = false;
