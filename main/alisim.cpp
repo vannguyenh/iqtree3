@@ -492,7 +492,7 @@ void executeSimulation(Params& params, IQTree *&tree)
             const double mean_bl = alisimulator->tree->treeLength() / alisimulator->tree->branchNum;
             if (mean_bl >= 10.0)
             {
-                outError("Extremely long mean branch length (" + convertDoubleToString(mean_bl) + ") detected. If your branch lengths are in generations rather than substitutions per site, please specify the population size using `-pop-size <NUM>`. Otherwise, you can add `--skip-bl-check` to skip checking branch lengths.");
+                outError("Extremely long mean branch length (" + convertDoubleToString(mean_bl) + ") detected. If your branch lengths are in generations rather than substitutions per site, please specify the population size using `-pop-size <NUM>` (or `population_size=<NUM> for the Python API). Otherwise, you can add `--skip-bl-check` to skip checking branch lengths.");
             }
         }
         // check all trees in a super tree with unlinked branch lengths
@@ -505,7 +505,7 @@ void executeSimulation(Params& params, IQTree *&tree)
                 const double mean_bl = super_tree->at(i)->treeLength() / alisimulator->tree->branchNum;
                 if (mean_bl >= 10.0)
                 {
-                    outError("Extremely long mean branch length (" + convertDoubleToString(mean_bl) + ") detected in partition tree " + convertIntToString(i + 1) + ". If your branch lengths are in generations rather than substitutions per site, please specify the population size using `-pop-size <NUM>`. Otherwise, you can add `--skip-bl-check` to skip checking branch lengths.");
+                    outError("Extremely long mean branch length (" + convertDoubleToString(mean_bl) + ") detected in partition tree " + convertIntToString(i + 1) + ". If your branch lengths are in generations rather than substitutions per site, please specify the population size using `-pop-size <NUM>` (or `population_size=<NUM> for the Python API). Otherwise, you can add `--skip-bl-check` to skip checking branch lengths.");
                 }
             }
         }

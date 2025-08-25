@@ -136,7 +136,8 @@ extern "C" StringResult version();
  * num_threads -- the number of threads
  * insertion_size_distribution -- the insertion size distribution
  * deletion_size_distribution -- the deletion size distribution
+ * population_size -- the population size
  */
-extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst_model, int seed, const char* partition_info = "", const char* partition_type = "", int seq_length = 1000, double insertion_rate = 0, double deletion_rate = 0, const char* root_seq = "", int num_threads = 1, const char* insertion_size_distribution = "", const char* deletion_size_distribution = "");
+extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst_model, int seed, const char* partition_info = "", const char* partition_type = "", int seq_length = 1000, double insertion_rate = 0, double deletion_rate = 0, const char* root_seq = "", int num_threads = 1, const char* insertion_size_distribution = "", const char* deletion_size_distribution = "", int population_size = -1);
 
 #endif /* LIBIQTREE2_FUN */

@@ -3171,7 +3171,8 @@ extern "C" StringResult version() {
 // num_threads -- the number of threads
 // insertion_size_distribution -- the insertion size distribution
 // deletion_size_distribution -- the deletion size distribution
-extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst_model, int seed, const char* partition_info, const char* partition_type, int seq_length, double insertion_rate, double deletion_rate, const char* root_seq, int num_threads, const char* insertion_size_distribution, const char* deletion_size_distribution) {
+// population_size -- the population size
+extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst_model, int seed, const char* partition_info, const char* partition_type, int seq_length, double insertion_rate, double deletion_rate, const char* root_seq, int num_threads, const char* insertion_size_distribution, const char* deletion_size_distribution, int population_size) {
     
     // verbose_mode
     // extern VerboseMode verbose_mode;
@@ -3192,6 +3193,16 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
         params.alisim_output_filename = "AliSimAlignment";
         params.out_prefix = "AliSimTrees.nwk";
         params.aln_output_format = IN_FASTA;
+        // set the population size, if specified
+        if (population_size != -1)
+        {
+            // validate the input
+            if (population_size <= 0)
+                outError("Population size must be positive!");
+            
+            // set the scaling factor
+            params.alisim_branch_scale = 0.5 / population_size;
+        }
         params.ran_seed = seed;
         init_random(params.ran_seed);
         // initialize multiple random streams if needed
