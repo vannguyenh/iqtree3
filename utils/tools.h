@@ -2734,6 +2734,11 @@ public:
     double alisim_branch_scale;
     
     /**
+    *  TRUE to skip branch length checking
+    */
+    bool alisim_skip_bl_check;
+    
+    /**
     *  TRUE to output all replicate alignments into a single file
     */
     bool alisim_single_output;

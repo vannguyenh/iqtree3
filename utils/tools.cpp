@@ -1588,6 +1588,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.alisim_skip_checking_memory = false;
     params.alisim_write_internal_sequences = false;
     params.alisim_only_unroot_tree = false;
+    params.alisim_skip_bl_check = false;
     params.branch_distribution = NULL;
     params.alisim_insertion_ratio = 0;
     params.alisim_deletion_ratio = 0;
@@ -2991,6 +2992,16 @@ void parseArg(int argc, char *argv[], Params &params) {
                     throw "<SCALE> must be positive!";
                 continue;
             }
+            if (strcmp(argv[cnt], "-pop-size") == 0 || strcmp(argv[cnt], "--pop-size") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -pop-size <NUM>";
+                const double pop_size = convert_double(argv[cnt]);
+                if (pop_size <= 0)
+                    throw "Population size must be positive!";
+                params.alisim_branch_scale = 0.5 / pop_size;
+                continue;
+            }
             if (strcmp(argv[cnt], "--site-rate") == 0) {
                 cnt++;
                 if (cnt >= argc)
@@ -3119,6 +3130,10 @@ void parseArg(int argc, char *argv[], Params &params) {
                 if (cnt >= argc)
                     throw "Use --branch-distribution <distribution_name> to specify a distribution, from which branch lengths will be randomly generated.";
                 params.branch_distribution = argv[cnt];
+                continue;
+            }
+            if (strcmp(argv[cnt], "--skip-bl-check") == 0) {
+                params.alisim_skip_bl_check = true;
                 continue;
             }
             if (strcmp(argv[cnt], "--simulation-thresh") == 0) {
@@ -6079,6 +6094,14 @@ void parseArg(int argc, char *argv[], Params &params) {
     if (params.alisim_active && !params.seed_specified)
         outError("To make the simulation reproducible, please specify a random seed via `-seed <NUM>`");
     
+    // Don't allow using both --branch-scale and -pop-size at the same time
+    if (params.alisim_active)
+    {
+        if (params.original_params.find("-branch-scale") != std::string::npos &&
+            params.original_params.find("-pop-size") != std::string::npos)
+            outError("Only one of `--branch-scale` or `-pop-size` can be specified at a time.");
+    }
+    
     // set default filename for the random tree if AliSim is running in Random mode
     if (params.alisim_active && !params.user_file && params.tree_gen != NONE)
     {
@@ -7966,6 +7989,7 @@ void Params::setDefault() {
     alisim_skip_checking_memory = false;
     alisim_write_internal_sequences = false;
     alisim_only_unroot_tree = false;
+    alisim_skip_bl_check = false;
     branch_distribution = NULL;
     alisim_insertion_ratio = 0;
     alisim_deletion_ratio = 0;
