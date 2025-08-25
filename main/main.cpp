@@ -3208,6 +3208,10 @@ extern "C" StringResult simulate_alignment(StringArray& trees, const char* subst
         // initialize multiple random streams if needed
         if (params.multi_rstreams_used)
             init_multi_rstreams();
+        
+        // load distributions from built-in file
+        read_distributions();
+        
         bool append_log = true;
         _log_file = params.out_prefix;
         _log_file += ".log";
