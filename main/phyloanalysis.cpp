@@ -3323,7 +3323,7 @@ void printMrBayesBlockFile(Params &params, IQTree* &iqtree) {
             <<"[This MrBayes Block Declaration provides the basic "
             << (iqtree->isSuperTree() ? "partition structure and models" : "models")
             << " from the IQTree Run.]" << endl
-            << "[Note that MrBayes does not support a large collection of models, so defaults of 'nst=6' for DNA and 'wag' for Protein will be used if a model that does not exist in MrBayes is used.]" << endl
+            << "[Note that MrBayes does not support a large collection of models, so defaults of 'nst=6' for DNA and 'gtr' for Protein will be used if a model that does not exist in MrBayes is used.]" << endl
             << "[Furthermore, the Model Parameter '+R' will be replaced by '+G+I'.]" << endl
             << "[This should be used as a Template Only.]" << endl << endl;
 
