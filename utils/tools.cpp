@@ -6588,9 +6588,6 @@ void usage_iqtree(char* argv[], bool full_command) {
     //			<< "  -stats <outfile>     Output some statistics about branch lengths" << endl
     //			<< "  -comp <treefile>     Compare tree with each in the input trees" << endl;
         << "  -mrbayes             Outputs a Mr Bayes block file, to use as a template for future analysis" << endl
-        << "                       Will not output if incompatible data types are used" << endl
-        << "                       (MrBayes only supports DNA, Codon, Protein, Binary and Morphological data)" << endl
-        << "                       There will be no substitution model data output for Lie Markov and Mixture models!" << endl
         << endl;
 
     if (full_command) {
