@@ -1211,6 +1211,6 @@ void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string
     if (equal_freq)
         out << " statefreqpr=fixed(equal)";
 
-    out << ";";
+    out << ";" << endl;
 }
 
