@@ -1207,38 +1207,9 @@ void ModelProtein::printMrBayesModelText(ofstream& out, string partition, string
     out << "  lset applyto=(" << partition << ") nucmodel=protein rates=" << rate_str << ";" << endl;
 
     out << "  prset applyto=(" << partition << ")" << " aamodelpr=fixed(" << mapped_model << ")";
-
+	
     if (equal_freq)
         out << " statefreqpr=fixed(equal)";
-
-    /*
-    // GTR Customization
-    if (strcmp(mapped_model.c_str(), "gtr") == 0) {
-        // add rate matrix and state frequencies (mandatory for setting gtr values)
-        out << " aarevmatpr=";
-
-        // if matrix is GTR20, use dirichlet, else use fixed
-        if (strcmp(name.c_str(), "GTR20") == 0)
-            out << "dirichlet(";
-        else
-            out << "fixed(";
-
-        for (int i = 0; i < getNumRateEntries(); ++i) {
-            if (i != 0) out << ", ";
-            out << minValueCheckMrBayes(rates[i]);
-        }
-        out << ")";
-
-        // Frequency type is never equal to FREQ_EQUAL, even with Poisson
-        // Frequency is also auto-set if we use a model defined by MrBayes
-        out << " statefreqpr=dirichlet(";
-        for (int i = 0; i < num_states; ++i) {
-            if (i != 0) out << ", ";
-            out << minValueCheckMrBayes(state_freq[i]);
-        }
-        out << ")";
-    }
-    */
 
     out << ";";
 }
