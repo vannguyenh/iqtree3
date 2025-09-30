@@ -218,13 +218,28 @@ int computeTotalSequenceLengthAllPartitions(PhyloSuperTree *super_tree)
 */
 void generateRandomTree(Params &params)
 {
-    if (params.sub_size < 3 && !params.aln_file) {
-        outError(ERR_FEW_TAXA);
-    }
-
     if (!params.user_file) {
         outError("Please specify an output tree file name");
     }
+    try {
+        ofstream out;
+        out.open(params.user_file);
+        generateRandomTree(params, out);
+        out.close();
+    } catch (ios::failure) {
+        outError(ERR_WRITE_OUTPUT, params.user_file);
+    }
+}
+
+/**
+*  generate a random tree
+*/
+void generateRandomTree(Params &params, ostream &out)
+{
+    if (params.sub_size < 3) {
+        outError(ERR_FEW_TAXA);
+    }
+
     ////cout << "Random number seed: " << params.ran_seed << endl << endl;
 
     SplitGraph sg;
@@ -238,8 +253,8 @@ void generateRandomTree(Params &params)
                 string tmp_str(params.user_file);
                 outError(tmp_str + " exists. Use `-redo` option if you want to overwrite it.");
             }
-            ofstream out;
-            out.open(params.user_file);
+            // ofstream out;
+            // out.open(params.user_file);
             MTree itree;
 
             if (params.second_tree) {
@@ -293,7 +308,7 @@ void generateRandomTree(Params &params)
                 mtree.printTree(out);
                 out << endl;
             }
-            out.close();
+            // out.close();
             cout << params.repeated_time << " tree(s) printed to " << params.user_file << endl;
             if (params.num_zero_len) {
                 out2.close();
@@ -1104,6 +1119,14 @@ void generateMultipleAlignmentsFromSingleTree(AliSimulator *super_alisimulator, 
                     break;
             }
         }
+        
+        // fix crashing issue because accessing to deallocated pointer
+        // delete first_insertion
+        if (super_alisimulator->first_insertion)
+        {
+            delete super_alisimulator->first_insertion;
+            super_alisimulator->first_insertion = nullptr;
+        }
     }
     
     // output full tree (with internal node names) if outputting internal sequences
@@ -1219,8 +1242,9 @@ void generatePartitionAlignmentFromSingleSimulator(AliSimulator *&alisimulator, 
         delete tmp_alisimulator;
 
         // bug fixes: avoid accessing to deallocated pointer
-        if (alisimulator->params->alisim_insertion_ratio + alisimulator->params->alisim_deletion_ratio > 0)
-            alisimulator->first_insertion = nullptr;
+        // Update: we must keep first_insertion for partition model, this pointer will be deleted in a later step
+        /*if (alisimulator->params->alisim_insertion_ratio + alisimulator->params->alisim_deletion_ratio > 0)
+            alisimulator->first_insertion = nullptr;*/
     }
 
 }
