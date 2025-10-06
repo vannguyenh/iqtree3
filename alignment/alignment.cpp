@@ -34,7 +34,7 @@ using namespace Eigen;
 char symbols_protein[] = "ARNDCQEGHILKMFPSTWYVX"; // X for unknown AA
 char symbols_dna[]     = "ACGT";
 char symbols_rna[]     = "ACGU";
-char symbols_genotype[]      = "ACGTMRWSYK";
+char symbols_genotype[]      = "ACGT123456!\"@$%&MRWSYK";
 //char symbols_binary[]  = "01";
 char symbols_morph[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
 // genetic code from tri-nucleotides (AAA, AAC, AAG, AAT, ..., TTT) to amino-acids
@@ -1596,7 +1596,7 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
     size_t sequenceCount = sequences.size();
     std::unordered_set<char> proper_nucleotides = {'A', 'C', 'G', 'T', 'U'};
     std::unordered_set<char> nucleotides = {'A', 'C', 'G', 'T', 'U', 'R', 'Y', 'W', 'S', 'M', 'K', 'B', 'H', 'D', 'V', 'N', 'X'};
-    std::unordered_set<char> di_nucleotides = {'R', 'Y', 'W', 'S', 'M', 'K', 'N', 'X'};
+    std::unordered_set<char> di_nucleotides = {'R', 'Y', 'W', 'S', 'M', 'K', 'N', 'X', '1', '2', '3', '4', '5', '6', '!', '"', '@', '$', '%', '&'};
     std::unordered_set<char> proper_amino_acids = {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S',  'T', 'W', 'Y', 'V'};
     std::unordered_set<char> binaries = {'0', '1'};
 //    std::unordered_set<char> gap_miss = {'?', '-', '.', '~'};
@@ -1652,6 +1652,8 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
         // there are some digit(s) in the data
         if (num_bin == (num_digit+num_alpha)) // For binary data, only 0, 1, ?, -, . can occur
             return SEQ_BINARY;
+        else if ((double)(num_alpha + num_digit) / (num_proper_nuc + num_di_nuc) > 0.6)
+            return SEQ_GENOTYPE;
         return SEQ_MORPH;
     }
     // can't decide
@@ -1665,7 +1667,9 @@ void Alignment::buildStateMap(char *map, SeqType seq_type) {
     map[(unsigned char)'-'] = STATE_UNKNOWN;
     map[(unsigned char)'~'] = STATE_UNKNOWN;
     map[(unsigned char)'.'] = STATE_UNKNOWN;
-    map[(unsigned char)'!'] = STATE_UNKNOWN; // frame shift
+    if (seq_type != SEQ_GENOTYPE)
+        map[(unsigned char)'!'] = STATE_UNKNOWN; // frame shift
+
     int len;
     switch (seq_type) {
         case SEQ_BINARY:
@@ -2298,14 +2302,16 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
     return 1;
 }
 
-void processSeq(string &sequence, string &line, int line_num) {
+void processSeq(string &sequence, char *sequence_type, string &line, int line_num) {
     int exclam_found = false;
     for (string::iterator it = line.begin(); it != line.end(); it++) {
         if ((*it) <= ' ') continue;
-        if (isalnum(*it) || (*it) == '-' || (*it) == '?'|| (*it) == '.' || (*it) == '*' || (*it) == '~')
+        if (isalnum(*it) || (*it) == '-' || (*it) == '?'|| (*it) == '.' || (*it) == '*' || (*it) == '~' \
+            || (*it) == '"' || (*it) == '@' || (*it) == '$' || (*it) == '%' || (*it) == '&')
             sequence.append(1, toupper(*it));
         else if ((*it) == '!') {
-            sequence.append(1, *it);
+                sequence.append(1, *it);
+
             if (!exclam_found) {
                 exclam_found = true;
                 cout << "Warning: Line " + convertIntToString(line_num) + ": '!' was found in the alignment, which will be interpreted as a gap" << endl;
@@ -2377,7 +2383,7 @@ void Alignment::doReadPhylip(char *filename, char *sequence_type, StrVector &seq
                     sequences[seq_id].append(1, state);
                     if (num_states < state+1) num_states = state+1;
                 }
-            } else processSeq(sequences[seq_id], line, line_num);
+            } else processSeq(sequences[seq_id], sequence_type, line, line_num);
             if (sequences[seq_id].length() != sequences[0].length()) {
                 err_str << "Line " << line_num << ": Sequence " << seq_names[seq_id] << " has wrong sequence length " << sequences[seq_id].length() << endl;
                 throw err_str.str();
@@ -2450,7 +2456,7 @@ void Alignment::doReadPhylipSequential(char *filename, char *sequence_type, StrV
                 seq_names[seq_id] = line.substr(0, pos);
                 line.erase(0, pos);
             }
-            processSeq(sequences[seq_id], line, line_num);
+            processSeq(sequences[seq_id], sequence_type, line, line_num);
             if (sequences[seq_id].length() > nsite)
                 throw ("Line " + convertIntToString(line_num) + ": Sequence " + seq_names[seq_id] + " is too long (" + convertIntToString(sequences[seq_id].length()) + ")");
             if (sequences[seq_id].length() == nsite) {
@@ -2487,7 +2493,7 @@ int Alignment::readStrVec(StrVector &names, StrVector &seqs, char *sequence_type
     sequences.clear();
     for (int i = 0; i < seqs.size(); i++) {
         string s = "";
-        processSeq(s, seqs[i], i+1);
+        processSeq(s, sequence_type, seqs[i], i+1);
         sequences.push_back(s);
     }
     
@@ -2577,7 +2583,7 @@ void Alignment::doReadFasta(char *filename, char *sequence_type, StrVector &sequ
             if (sequences.empty()) {
                 throw "First line must begin with '>' to define sequence name";
             }
-            processSeq(sequences.back(), line, line_num);
+            processSeq(sequences.back(), sequence_type, line, line_num);
             progress = (double)in.getCompressedPosition();
         }
     }
@@ -2691,7 +2697,7 @@ void Alignment::doReadClustal(char *filename, char *sequence_type, StrVector &se
         pos = line.find_first_of(" \t");
         line = line.substr(0, pos);
         // read sequence contents
-        processSeq(sequences[seq_count], line, line_num);
+        processSeq(sequences[seq_count], sequence_type, line, line_num);
         seq_count++;
     }
     in.clear();
@@ -2806,7 +2812,7 @@ void Alignment::doReadMSF(char *filename, char *sequence_type, StrVector &sequen
 
         line = line.substr(pos+1);
         // read sequence contents
-        processSeq(sequences[seq_count], line, line_num);
+        processSeq(sequences[seq_count], sequence_type, line, line_num);
         seq_count++;
         if (seq_count == seq_names.size())
             seq_count = 0;
