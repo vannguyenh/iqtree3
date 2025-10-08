@@ -1699,19 +1699,7 @@ void Alignment::buildStateMap(char *map, SeqType seq_type) {
             return;
         case SEQ_GENOTYPE: // Genotype
             for (int i = 0; i < STATE_UNKNOWN; i++)
-                if (STATE_UNKNOWN == 10) {
-                    map[(unsigned char)'A'] = 0;
-                    map[(unsigned char)'C'] = 1;
-                    map[(unsigned char)'G'] = 2;
-                    map[(unsigned char)'T'] = 3;
-                    map[(unsigned char)'M'] = 4; // A/C
-                    map[(unsigned char)'R'] = 5; // A/G
-                    map[(unsigned char)'W'] = 6; // A/T
-                    map[(unsigned char)'S'] = 7; // C/G
-                    map[(unsigned char)'Y'] = 8; // C/T
-                    map[(unsigned char)'K'] = 9; // G/T
-                } else if (STATE_UNKNOWN == 16)
-                    map[(int)symbols_genotype[i]] = i;
+                map[(int)symbols_genotype[i]] = i;
             map[(unsigned char)'N'] = STATE_UNKNOWN; //missing character
             return;
         case SEQ_PROTEIN: // Protein
@@ -1810,7 +1798,7 @@ StateType Alignment::convertState(char state, SeqType seq_type) {
         loc = strchr(symbols_genotype, state);
 
         if (!loc) return STATE_INVALID; // unrecognize character
-        state = loc - symbols_protein;
+        state = loc - symbols_genotype;
         if (state < num_states)
             return state;
         else
