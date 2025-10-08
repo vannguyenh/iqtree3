@@ -35,8 +35,7 @@ using namespace Eigen;
 char symbols_protein[] = "ARNDCQEGHILKMFPSTWYVX"; // X for unknown AA
 char symbols_dna[]     = "ACGT";
 char symbols_rna[]     = "ACGU";
-char symbols_genotype[]      = "ACGT123456!\"@$%&MRWSYK";
-//char symbols_genotype16[]      = "ACGT123456!\"@$%&";
+char symbols_genotype[]      = "ACGTMRWSYK!\"@$%&";
 //char symbols_binary[]  = "01";
 char symbols_morph[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
 // genetic code from tri-nucleotides (AAA, AAC, AAG, AAT, ..., TTT) to amino-acids
@@ -1640,7 +1639,7 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
     size_t sequenceCount = sequences.size();
     std::unordered_set<char> proper_nucleotides = {'A', 'C', 'G', 'T', 'U'};
     std::unordered_set<char> nucleotides = {'A', 'C', 'G', 'T', 'U', 'R', 'Y', 'W', 'S', 'M', 'K', 'B', 'H', 'D', 'V', 'N', 'X'};
-    std::unordered_set<char> di_nucleotides = {'R', 'Y', 'W', 'S', 'M', 'K', 'N', 'X', '1', '2', '3', '4', '5', '6', '!', '"', '@', '$', '%', '&'};
+    std::unordered_set<char> di_nucleotides = {'R', 'Y', 'W', 'S', 'M', 'K', 'N', 'X', '!', '"', '@', '$', '%', '&'};
     std::unordered_set<char> proper_amino_acids = {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S',  'T', 'W', 'Y', 'V'};
     std::unordered_set<char> binaries = {'0', '1'};
 //    std::unordered_set<char> gap_miss = {'?', '-', '.', '~'};
@@ -1680,7 +1679,7 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
         if (num_nuc == num_alpha) {
             if ((double)num_proper_nuc / num_alpha > 0.9) {
                 return SEQ_DNA;
-            } else if ((num_proper_nuc+num_di_nuc) == num_alpha) {
+            } else if ((num_proper_nuc+num_di_nuc) >= num_alpha) {
                 return SEQ_GENOTYPE;
             } else {
                 return SEQ_UNKNOWN;
@@ -1696,8 +1695,6 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
         // there are some digit(s) in the data
         if (num_bin == (num_digit+num_alpha)) // For binary data, only 0, 1, ?, -, . can occur
             return SEQ_BINARY;
-        else if ((double)(num_alpha + num_digit) / (num_proper_nuc + num_di_nuc) > 0.6)
-            return SEQ_GENOTYPE;
         return SEQ_MORPH;
     }
     // can't decide
@@ -2365,14 +2362,14 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
 
 void processSeq(string &sequence, string &line, int line_num) {
     int exclam_found = false;
+    std::unordered_set<char> gap_miss = {'-', '?', '.', '*', '~'};
+    std::unordered_set<char> genotype = {'"', '@', '$', '%', '&', '!'};
     for (string::iterator it = line.begin(); it != line.end(); it++) {
         if ((*it) <= ' ') continue;
-        if (isalnum(*it) || (*it) == '-' || (*it) == '?'|| (*it) == '.' || (*it) == '*' || (*it) == '~' \
-            || (*it) == '"' || (*it) == '@' || (*it) == '$' || (*it) == '%' || (*it) == '&')
+        
+        if (isalnum(*it) || gap_miss.find(*it) != gap_miss.end() || genotype.find(*it) != genotype.end())
             sequence.append(1, toupper(*it));
-        else if ((*it) == '!') {
-                sequence.append(1, *it);
-
+            if ((*it) == '!') {
                 if (!exclam_found) {
                     exclam_found = true;
                     cout << "Warning: Line " + convertIntToString(line_num) + ": '!' was found in the alignment, which will be interpreted as a gap unless the data is genotype." << endl;
