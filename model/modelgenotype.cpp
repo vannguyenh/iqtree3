@@ -49,7 +49,12 @@ void ModelGenotype::init_base_model(const char *base_model_name,
                                     string freq_params) {
     // Trick ModelDNA constructor by setting the number of states to 4 (DNA).
     phylo_tree->aln->num_states = dna_states;
-    string freq_params_base_model = compute_freq_params_base_model(freq_params);
+    string freq_params_base_model;
+    if (freq_params.empty()) {
+        freq_params_base_model = "";
+    } else {
+        freq_params_base_model = compute_freq_params_base_model(freq_params);
+    }
     try {
         string base_model_str = base_model_name;
         if (ModelMarkov::validModelName(base_model_str))
@@ -64,7 +69,7 @@ void ModelGenotype::init_base_model(const char *base_model_name,
 
     // Reset the number of states.
     phylo_tree->aln->num_states = num_states;
-    
+
     // Set reversibility state.
     is_reversible = base_model->is_reversible;
     if (!is_reversible)
@@ -85,10 +90,31 @@ void ModelGenotype::init_genotype_frequencies(string freq_params) {
             break;
         case FREQ_EMPIRICAL: //'+F'
         case FREQ_ESTIMATE:
-        case FREQ_USER_DEFINED:
-            for (int i=0; i < num_states; i++)
-                state_freq[i] = freq_params[i];
+        case FREQ_USER_DEFINED: {
+            if (freq_params.empty()) {
+                // No +F{...} given -> keep legacy behavior: empirical genotypes
+                phylo_tree->aln->computeStateFreq(state_freq);
+                break;
+            }
+            // Parse exactly num_states comma-separated numbers (braces/spaces allowed)
+            std::string buf;
+            buf.reserve(freq_params.size());
+            for (char c : freq_params) {
+                if (!std::isspace((unsigned char)c) && c!='{' && c!='}')
+                    buf.push_back(c);
+            }
+            std::istringstream iss(buf);
+            std::string tok;
+            int i = 0;
+            while (std::getline(iss, tok, ',') && i < num_states) {
+                if (!tok.empty()) state_freq[i++] = std::stod(tok);
+            }
+            if (i != num_states) {
+                outError("Genotype +F{...}: expected " + std::to_string(num_states) +
+                         " values, got " + std::to_string(i));
+            }
             break;
+        }
         case FREQ_UNKNOWN:
             phylo_tree->aln->computeStateFreq(state_freq);
             break;
@@ -100,7 +126,6 @@ void ModelGenotype::init_genotype_frequencies(string freq_params) {
 }
 
 string ModelGenotype::compute_freq_params_base_model(string freq_params) {
-
     std::vector<double> freq_prams_base_model(4, 0.0);
     std::vector<double> freq_params_vector;
 
@@ -138,10 +163,9 @@ string ModelGenotype::compute_freq_params_base_model(string freq_params) {
 void ModelGenotype::init(const char *model_name, string model_params, StateFreqType freq_type, string freq_params)
 {
     const char *plus = std::strchr(model_name, '+');
-    
-    if (! plus) {
+
+    if (!plus)
         outError("Genotype model is not well defined. No base model and genotype model are defined.");
-    }
     
     std::string base_model_name(model_name, plus - model_name);
     std::string gt_model_name(plus + 1);
@@ -180,17 +204,26 @@ void ModelGenotype::saveCheckpoint() {
 }
 
 void ModelGenotype::restoreCheckpoint() {
+    // Restore genotype-level state (sizes, state_freq for 10/16 states)
     ModelMarkov::restoreCheckpoint();
+
+    // Restore the base DNA model (4-state)
     startCheckpoint();
     CKP_ARRAY_RESTORE(dna_states, base_model->state_freq);
     base_model->restoreCheckpoint();
     endCheckpoint();
-    
-    // restore the base model
-    ModelMarkov::restoreCheckpoint();
-    decomposeRateMatrix();
-    if (phylo_tree)
-        phylo_tree->clearAllPartialLH();
+
+    // Ensure we are back in genotype state space before any Eigen allocations
+    phylo_tree->aln->num_states = num_states;
+
+    // Make sure base_model’s internal matrices/rates are ready before we use them
+    base_model->decomposeRateMatrix();
+
+    // Build genotype Q and decompose
+    computeGenotypeRateMatrix();
+    ModelMarkov::decomposeRateMatrix();
+
+    if (phylo_tree) phylo_tree->clearAllPartialLH();
 }
 
 void ModelGenotype::computeGenotypeRateMatrix() {
