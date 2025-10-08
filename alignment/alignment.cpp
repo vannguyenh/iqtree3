@@ -35,6 +35,7 @@ char symbols_protein[] = "ARNDCQEGHILKMFPSTWYVX"; // X for unknown AA
 char symbols_dna[]     = "ACGT";
 char symbols_rna[]     = "ACGU";
 char symbols_genotype[]      = "ACGT123456!\"@$%&MRWSYK";
+//char symbols_genotype16[]      = "ACGT123456!\"@$%&";
 //char symbols_binary[]  = "01";
 char symbols_morph[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
 // genetic code from tri-nucleotides (AAA, AAC, AAG, AAT, ..., TTT) to amino-acids
@@ -1698,7 +1699,19 @@ void Alignment::buildStateMap(char *map, SeqType seq_type) {
             return;
         case SEQ_GENOTYPE: // Genotype
             for (int i = 0; i < STATE_UNKNOWN; i++)
-                map[(int)symbols_genotype[i]] = i;
+                if (STATE_UNKNOWN == 10) {
+                    map[(unsigned char)'A'] = 0;
+                    map[(unsigned char)'C'] = 1;
+                    map[(unsigned char)'G'] = 2;
+                    map[(unsigned char)'T'] = 3;
+                    map[(unsigned char)'M'] = 4; // A/C
+                    map[(unsigned char)'R'] = 5; // A/G
+                    map[(unsigned char)'W'] = 6; // A/T
+                    map[(unsigned char)'S'] = 7; // C/G
+                    map[(unsigned char)'Y'] = 8; // C/T
+                    map[(unsigned char)'K'] = 9; // G/T
+                } else if (STATE_UNKNOWN == 16)
+                    map[(int)symbols_genotype[i]] = i;
             map[(unsigned char)'N'] = STATE_UNKNOWN; //missing character
             return;
         case SEQ_PROTEIN: // Protein
@@ -2302,7 +2315,7 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
     return 1;
 }
 
-void processSeq(string &sequence, char *sequence_type, string &line, int line_num) {
+void processSeq(string &sequence, string &line, int line_num) {
     int exclam_found = false;
     for (string::iterator it = line.begin(); it != line.end(); it++) {
         if ((*it) <= ' ') continue;
@@ -2383,7 +2396,7 @@ void Alignment::doReadPhylip(char *filename, char *sequence_type, StrVector &seq
                     sequences[seq_id].append(1, state);
                     if (num_states < state+1) num_states = state+1;
                 }
-            } else processSeq(sequences[seq_id], sequence_type, line, line_num);
+            } else processSeq(sequences[seq_id], line, line_num);
             if (sequences[seq_id].length() != sequences[0].length()) {
                 err_str << "Line " << line_num << ": Sequence " << seq_names[seq_id] << " has wrong sequence length " << sequences[seq_id].length() << endl;
                 throw err_str.str();
@@ -2456,7 +2469,7 @@ void Alignment::doReadPhylipSequential(char *filename, char *sequence_type, StrV
                 seq_names[seq_id] = line.substr(0, pos);
                 line.erase(0, pos);
             }
-            processSeq(sequences[seq_id], sequence_type, line, line_num);
+            processSeq(sequences[seq_id], line, line_num);
             if (sequences[seq_id].length() > nsite)
                 throw ("Line " + convertIntToString(line_num) + ": Sequence " + seq_names[seq_id] + " is too long (" + convertIntToString(sequences[seq_id].length()) + ")");
             if (sequences[seq_id].length() == nsite) {
@@ -2493,7 +2506,7 @@ int Alignment::readStrVec(StrVector &names, StrVector &seqs, char *sequence_type
     sequences.clear();
     for (int i = 0; i < seqs.size(); i++) {
         string s = "";
-        processSeq(s, sequence_type, seqs[i], i+1);
+        processSeq(s,seqs[i], i+1);
         sequences.push_back(s);
     }
     
@@ -2583,7 +2596,7 @@ void Alignment::doReadFasta(char *filename, char *sequence_type, StrVector &sequ
             if (sequences.empty()) {
                 throw "First line must begin with '>' to define sequence name";
             }
-            processSeq(sequences.back(), sequence_type, line, line_num);
+            processSeq(sequences.back(), line, line_num);
             progress = (double)in.getCompressedPosition();
         }
     }
@@ -2697,7 +2710,7 @@ void Alignment::doReadClustal(char *filename, char *sequence_type, StrVector &se
         pos = line.find_first_of(" \t");
         line = line.substr(0, pos);
         // read sequence contents
-        processSeq(sequences[seq_count], sequence_type, line, line_num);
+        processSeq(sequences[seq_count], line, line_num);
         seq_count++;
     }
     in.clear();
@@ -2812,7 +2825,7 @@ void Alignment::doReadMSF(char *filename, char *sequence_type, StrVector &sequen
 
         line = line.substr(pos+1);
         // read sequence contents
-        processSeq(sequences[seq_count], sequence_type, line, line_num);
+        processSeq(sequences[seq_count], line, line_num);
         seq_count++;
         if (seq_count == seq_names.size())
             seq_count = 0;
