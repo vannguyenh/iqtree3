@@ -2313,10 +2313,10 @@ void processSeq(string &sequence, string &line, int line_num) {
         else if ((*it) == '!') {
                 sequence.append(1, *it);
 
-            if (!exclam_found) {
-                exclam_found = true;
-                cout << "Warning: Line " + convertIntToString(line_num) + ": '!' was found in the alignment, which will be interpreted as a gap" << endl;
-            }
+                if (!exclam_found) {
+                    exclam_found = true;
+                    cout << "Warning: Line " + convertIntToString(line_num) + ": '!' was found in the alignment, which will be interpreted as a gap unless the data is genotype." << endl;
+                }
         }
         else if (*it == '(' || *it == '{') {
             auto start_it = it;
@@ -2494,7 +2494,7 @@ int Alignment::readStrVec(StrVector &names, StrVector &seqs, char *sequence_type
     sequences.clear();
     for (int i = 0; i < seqs.size(); i++) {
         string s = "";
-        processSeq(s,seqs[i], i+1);
+        processSeq(s, seqs[i], i+1);
         sequences.push_back(s);
     }
     
