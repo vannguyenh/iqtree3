@@ -2367,13 +2367,14 @@ void processSeq(string &sequence, string &line, int line_num) {
     for (string::iterator it = line.begin(); it != line.end(); it++) {
         if ((*it) <= ' ') continue;
         
-        if (isalnum(*it) || gap_miss.find(*it) != gap_miss.end() || genotype.find(*it) != genotype.end())
+        if (isalnum(*it) || gap_miss.find(*it) != gap_miss.end() || genotype.find(*it) != genotype.end()) {
             sequence.append(1, toupper(*it));
             if ((*it) == '!') {
                 if (!exclam_found) {
                     exclam_found = true;
                     cout << "Warning: Line " + convertIntToString(line_num) + ": '!' was found in the alignment, which will be interpreted as a gap unless the data is genotype." << endl;
                 }
+            }
         }
         else if (*it == '(' || *it == '{') {
             auto start_it = it;
