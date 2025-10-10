@@ -383,7 +383,7 @@ void AliSimulator::initializeAlignment(IQTree *tree, string model_fullname)
             {
                 tree->aln->sequence_type = tree->aln->getSeqTypeStr(tree->aln->seq_type);
                 // Bug fix: avoid loosing the codon<format>
-                if (tree->aln->seq_type == SEQ_CODON && params->sequence_type && string(params->sequence_type) != "")
+                if ( (tree->aln->seq_type == SEQ_CODON || tree->aln->seq_type == SEQ_GENOTYPE) && params->sequence_type && string(params->sequence_type) != "")
                     tree->aln->sequence_type = params->sequence_type;
             }
         }
@@ -393,27 +393,29 @@ void AliSimulator::initializeAlignment(IQTree *tree, string model_fullname)
         outError("Could not detect SequenceType from Model Name. Please check your Model Name or specify the SequenceType by --seqtype <SEQ_TYPE_STR> where <SEQ_TYPE_STR> is BIN, DNA, AA, NT2AA, CODON, or MORPH.");
     
     switch (tree->aln->seq_type) {
-    case SEQ_BINARY:
-        tree->aln->num_states = 2;
-        break;
-    case SEQ_DNA:
-        tree->aln->num_states = 4;
-        break;
-    case SEQ_PROTEIN:
-        tree->aln->num_states = 20;
-        break;
-    case SEQ_MORPH:
-            // only set num_state if it has not yet set (noting that num_states of Morph could be set in partition file)
-            if (tree->aln->num_states == 0)
-                tree->aln->num_states = params->alisim_num_states_morph;
-            
-            // throw error if users dont specify the number of states when simulating morph data
-            if (tree->aln->num_states <= 0)
-                outError("Please specify the number of states for morphological data by --seqtype MORPH{<NUM_STATES>}");
-        break;
-    case SEQ_POMO:
-        throw "Sorry! SEQ_POMO is currently not supported";
-        break;
+        case SEQ_BINARY:
+            tree->aln->num_states = 2;
+            break;
+        case SEQ_DNA:
+            tree->aln->num_states = 4;
+            break;
+        case SEQ_PROTEIN:
+            tree->aln->num_states = 20;
+            break;
+        case SEQ_MORPH:
+                // only set num_state if it has not yet set (noting that num_states of Morph could be set in partition file)
+                if (tree->aln->num_states == 0)
+                    tree->aln->num_states = params->alisim_num_states_morph;
+
+                // throw error if users dont specify the number of states when simulating morph data
+                if (tree->aln->num_states <= 0)
+                    outError("Please specify the number of states for morphological data by --seqtype MORPH{<NUM_STATES>}");
+            break;
+        case SEQ_POMO:
+            throw "Sorry! SEQ_POMO is currently not supported";
+            break;
+        case SEQ_GENOTYPE:
+            tree->aln->num_states = std::stoi(model_fullname.substr(2));
     default:
         break;
     }
