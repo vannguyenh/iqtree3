@@ -61,7 +61,7 @@
 const char* bin_model_names[] = {"GTR2", "JC2"};
 
 /******* Genotype model set ******/
-const char* genotype_model_names[] = {"GTR", "JC"};
+const char* genotype_model_names[] = {"GT10", "GT16"};
 
 /******* Morphological model set ******/
 // 2018-08-20: don't test ORDERED model due to lots of numerical issues
@@ -567,18 +567,26 @@ int detectSeqType(const char *model_name, SeqType &seq_type) {
             break;
         }
 
+    copyCString(genotype_model_names, sizeof(genotype_model_names)/sizeof(char*), model_list, true);
+    for (i = 0; i < model_list.size(); i++)
+        if (model_str.substr(0,model_list[i].length()) == model_list[i]) {
+            seq_type = SEQ_GENOTYPE;
+            empirical_model = true;
+        }
+
     return (empirical_model) ? 2 : 1;
 }
 
 string convertSeqTypeToSeqTypeName(SeqType seq_type)
 {
     switch (seq_type) {
-    case SEQ_BINARY: return "BIN"; break;
-    case SEQ_MORPH: return "MORPH"; break;
-    case SEQ_DNA: return "DNA"; break;
-    case SEQ_PROTEIN: return "AA"; break;
-    case SEQ_CODON: return "CODON"; break;
-    default: break;
+        case SEQ_BINARY: return "BIN"; break;
+        case SEQ_MORPH: return "MORPH"; break;
+        case SEQ_DNA: return "DNA"; break;
+        case SEQ_PROTEIN: return "AA"; break;
+        case SEQ_CODON: return "CODON"; break;
+        case SEQ_GENOTYPE: return "GT"; break;
+        default: break;
     }
     return "";
 }

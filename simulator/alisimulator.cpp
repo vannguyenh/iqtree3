@@ -15,7 +15,8 @@ AliSimulator::AliSimulator(Params *input_params, int expected_number_sites, doub
     params = input_params;
     AliSimulator::initializeIQTreeFromTreeFile();
     tree->initSequences();
-    num_sites_per_state = tree->aln->seq_type == SEQ_CODON?3:1;
+    num_sites_per_state =
+        (tree->aln->seq_type == SEQ_CODON) ? 3: (tree->aln->seq_type == SEQ_GENOTYPE) ? 2 : 1;
     STATE_UNKNOWN = tree->aln->STATE_UNKNOWN;
     max_num_states = tree->aln->getMaxNumStates();
     latest_insertion = NULL;
@@ -49,7 +50,8 @@ AliSimulator::AliSimulator(Params *input_params, IQTree *iq_tree, int expected_n
     params = input_params;
     tree = iq_tree;
     tree->initSequences();
-    num_sites_per_state = tree->aln->seq_type == SEQ_CODON?3:1;
+    num_sites_per_state =
+        (tree->aln->seq_type == SEQ_CODON) ? 3: (tree->aln->seq_type == SEQ_GENOTYPE) ? 2 : 1;
     STATE_UNKNOWN = tree->aln->STATE_UNKNOWN;
     max_num_states = tree->aln->getMaxNumStates();
     latest_insertion = NULL;
@@ -416,6 +418,7 @@ void AliSimulator::initializeAlignment(IQTree *tree, string model_fullname)
             break;
         case SEQ_GENOTYPE:
             tree->aln->num_states = std::stoi(model_fullname.substr(2));
+            break;
     default:
         break;
     }
@@ -688,6 +691,7 @@ void AliSimulator::getStateFrequenciesFromModel(IQTree* tree, double *state_freq
              || (tree->getModel()->getFreqType() == FREQ_EQUAL)
         || (ModelLieMarkov::validModelName(tree->getModel()->getName()))
              || tree->aln->seq_type == SEQ_CODON
+             || tree->aln->seq_type == SEQ_GENOTYPE
              || (tree->getModel()->getFreqType() == FREQ_EMPIRICAL && params->alisim_inference_mode))
         tree->getModel()->getStateFrequency(state_freqs);
     else // otherwise, randomly generate the base frequencies
@@ -2238,8 +2242,10 @@ void AliSimulator::initializeStateMapping(int num_sites_per_state, Alignment *al
         state_mapping[i] = aln->convertStateBackStr(i);
 
     // add an additional state for gap
-    if (num_sites_per_state == 3)
+    if (num_sites_per_state == 3) // SEQ_CODON
         state_mapping[total_states-1] = "---";
+    else if (num_sites_per_state == 2) // SEQ_GENOTYPE
+        state_mapping[total_states-1] = "--";
 }
 
 /**
@@ -2258,7 +2264,7 @@ void AliSimulator::convertNumericalStatesIntoReadableCharacters(vector<short int
             output[i] = state_mapping[sequence_chunk[i]][0];
     }
     // convert CODON
-    else
+    else if (num_sites_per_state == 3)
     {
         int index = 0;
         for (int i = 0; i < segment_length; i++, index += num_sites_per_state)
@@ -2267,6 +2273,15 @@ void AliSimulator::convertNumericalStatesIntoReadableCharacters(vector<short int
             output[index] = codon_str[0];
             output[index + 1] = codon_str[1];
             output[index + 2] = codon_str[2];
+        }
+    }
+    // convert GENOTYPE
+    else {
+        int index = 0;
+        for (int i = 0; i < segment_length; i++, index += num_sites_per_state) {
+            string genotype_str = state_mapping[sequence_chunk[i]];
+            output[index] = genotype_str[0];
+            output[index + 1] = genotype_str[1];
         }
     }
 }
@@ -2700,7 +2715,7 @@ void AliSimulator::exportSequenceWithGaps(vector<short int> &sequence_chunk, str
             }
         }
         // convert CODON
-        else
+        else if (num_sites_per_state == 3)
         {
             int index = 0;
             int segment_start_plus_index = segment_start;
@@ -2725,6 +2740,26 @@ void AliSimulator::exportSequenceWithGaps(vector<short int> &sequence_chunk, str
                     output[index] = codon_str[0];
                     output[index + 1] = codon_str[1];
                     output[index + 2] = codon_str[2];
+                }
+            }
+        }
+        else {
+            int index = 0;
+            int segment_start_plus_index = segment_start;
+            for (int i = 0; i < segment_length; i++, index += num_sites_per_state, segment_start_plus_index += num_sites_per_state) {
+                // handle gaps in SEQ_GENOTYPE
+                if (segment_start_plus_index + 1 < input_sequence.length()
+                    && (input_sequence[segment_start_plus_index] == '-'
+                    || input_sequence[segment_start_plus_index + 1] == '-'
+                    || input_sequence[segment_start_plus_index] == '.'
+                    || input_sequence[segment_start_plus_index + 1] == '.')) {
+                    // insert gaps
+                    output[index] = input_sequence[segment_start_plus_index];
+                    output[index + 1] = input_sequence[segment_start_plus_index + 1];
+                } else {
+                    string genotype_str = state_mapping[sequence_chunk[i]];
+                    output[index] = genotype_str[0];
+                    output[index + 1] = genotype_str[1];
                 }
             }
         }
