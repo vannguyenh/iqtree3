@@ -176,7 +176,7 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     // Initialise the base model
     init_base_model(base_model_name.c_str(), model_params, freq_type, freq_params);
     cout << "Initialised base genotype model of :"  << endl;
-    cout << "Model name: " << base_model->getName() << endl;
+    cout << "Base model name: " << base_model->getName() << endl;
     // compute and install the genotype frequencies
     init_genotype_frequencies(freq_params);
 }
