@@ -1677,10 +1677,10 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
         if (num_alpha < 10) // two few occurences to decide
             return SEQ_UNKNOWN;
         if (num_nuc == num_alpha) {
-            if ((num_proper_nuc+num_di_nuc) >= num_alpha) {
-                return SEQ_GENOTYPE;
-            } else if ((double)num_proper_nuc / num_alpha > 0.9) {
+            if ((double)num_proper_nuc / num_alpha > 0.9) {
                 return SEQ_DNA;
+            } else if ((num_proper_nuc+num_di_nuc) >= num_alpha) {
+                return SEQ_GENOTYPE;
             } else {
                 return SEQ_UNKNOWN;
             }
