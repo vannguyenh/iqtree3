@@ -2844,16 +2844,20 @@ extern "C" StringResult build_tree(StringArray& names, StringArray& seqs, const 
 
 // Perform phylogenetic analysis on the input alignment (in string format)
 // With restriction to the input toplogy
+// blfix -- whether to fix the branch length as those on the given tree, default: false
 // num_thres -- number of cpu threads to be used, default: 1; 0 - auto detection of the optimal number of cpu threads
-extern "C" StringResult fit_tree(StringArray& names, StringArray& seqs, const char* model, const char* intree, int rand_seed, int num_thres) {
+extern "C" StringResult fit_tree(StringArray& names, StringArray& seqs, const char* model, const char* intree, bool blfix, int rand_seed, int num_thres) {
     StringResult output;
     output.errorStr = strdup("");
     
     try {
         input_options* in_options = NULL;
-        if (num_thres >= 0) {
+        if (num_thres >= 0 || blfix) {
             in_options = new input_options();
-            in_options->insert("-nt", convertIntToString(num_thres));
+            if (num_thres >= 0)
+                in_options->insert("-nt", convertIntToString(num_thres));
+            if (blfix)
+                in_options->insert("-blfix", "");
         }
         string prog = "fit_tree";
         output.value = build_phylogenetic(names, seqs, model, intree, rand_seed, prog, in_options);
@@ -3687,8 +3691,15 @@ void input_options::set_params(Params& params) {
             params.consensus_type = CT_CONSENSUS_TREE;
             params.stop_condition = SC_BOOTSTRAP_CORRELATION;
         }
-        else if (flags[0] == "-nt") {
+        else if (flags[i] == "-nt") {
             params.num_threads = atoi(values[i].c_str());
+        }
+        else if (flags[i] == "-blfix") {
+            params.fixed_branch_length = BRLEN_FIX;
+            params.optimize_alg_gammai = "Brent";
+            params.opt_gammai = false;
+            params.min_iterations = 0;
+            params.stop_condition = SC_FIXED_ITERATION;
         }
     }
 }
