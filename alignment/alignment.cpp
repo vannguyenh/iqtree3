@@ -1639,7 +1639,7 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
     size_t sequenceCount = sequences.size();
     std::unordered_set<char> proper_nucleotides = {'A', 'C', 'G', 'T', 'U'};
     std::unordered_set<char> nucleotides = {'A', 'C', 'G', 'T', 'U', 'R', 'Y', 'W', 'S', 'M', 'K', 'B', 'H', 'D', 'V', 'N', 'X'};
-    std::unordered_set<char> di_nucleotides = {'R', 'Y', 'W', 'S', 'M', 'K', 'N', 'X', '!', '"', '@', '$', '%', '&'};
+    std::unordered_set<char> di_nucleotides = {'M', 'R', 'W', 'S', 'Y', 'K', '!', '"', '@', '$', '%', '&', 'N'};
     std::unordered_set<char> proper_amino_acids = {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S',  'T', 'W', 'Y', 'V'};
     std::unordered_set<char> binaries = {'0', '1'};
 //    std::unordered_set<char> gap_miss = {'?', '-', '.', '~'};
@@ -1677,7 +1677,7 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
         if (num_alpha < 10) // two few occurences to decide
             return SEQ_UNKNOWN;
         if (num_nuc == num_alpha) {
-            if ((double)num_proper_nuc / num_alpha > 0.9) {
+            if (((double)num_proper_nuc / num_alpha > 0.9) && ((num_di_nuc+num_proper_nuc) != num_nuc)){
                 return SEQ_DNA;
             } else if ((num_proper_nuc+num_di_nuc) >= num_alpha) {
                 return SEQ_GENOTYPE;
