@@ -1973,13 +1973,7 @@ string Alignment::convertStateBackStr(StateType state) {
         str += symbols_dna[state%4];
         return str;
 	}
-    if (seq_type == SEQ_GENOTYPE) {
-        // genotype data
-        if (state >= num_states) return "??";
-        str = symbols_dna[gt_nt_map[state].first];
-        str += symbols_dna[gt_nt_map[state].second];
-        return str;
-    }
+
     // all other data types
     str = convertStateBack(state);
 	return str;

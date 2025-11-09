@@ -7,7 +7,7 @@ Substitution::Substitution(const std::string& sub_str, Alignment* const aln, con
     // validate the input
     if (!aln)
         outError("Null alignment found when parsing the predefined mutation: " + sub_str);
-    const int num_sites_per_state = aln->seq_type == SEQ_CODON ? 3 : 1;
+    const int num_sites_per_state = aln->seq_type == SEQ_CODON ? 3 : aln->seq_type == SEQ_GENOTYPE ? 2 : 1;
     const int input_length = sub_str.length();
     if (input_length < num_sites_per_state + num_sites_per_state + 1)
         outError("Failed to parse the predefined mutation: '" + sub_str + "'");

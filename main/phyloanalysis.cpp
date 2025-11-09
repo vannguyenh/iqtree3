@@ -2205,7 +2205,7 @@ void exportAliSimCMD(Params &params, IQTree &tree, ostream &out)
     if (!params.partition_file)
     {
         string root_length = "";
-        int num_sites = tree.aln->getNSite() * (tree.aln->seq_type == SEQ_CODON ? 3 : 1);
+        int num_sites = tree.aln->getNSite() * (tree.aln->seq_type == SEQ_CODON ? 3 : tree.aln->seq_type == SEQ_GENOTYPE ? 2 : 1);
         root_length += " --length " + convertIntToString(num_sites);
         alisim_cmd += root_length;
     }
