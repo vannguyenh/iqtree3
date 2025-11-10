@@ -691,7 +691,7 @@ void AliSimulator::getStateFrequenciesFromModel(IQTree* tree, double *state_freq
              || (tree->getModel()->getFreqType() == FREQ_EQUAL)
         || (ModelLieMarkov::validModelName(tree->getModel()->getName()))
              || tree->aln->seq_type == SEQ_CODON
-             || tree->aln->seq_type == SEQ_GENOTYPE
+             //|| tree->aln->seq_type == SEQ_GENOTYPE
              || (tree->getModel()->getFreqType() == FREQ_EMPIRICAL && params->alisim_inference_mode))
         tree->getModel()->getStateFrequency(state_freqs);
     else // otherwise, randomly generate the base frequencies
@@ -704,6 +704,9 @@ void AliSimulator::getStateFrequenciesFromModel(IQTree* tree, double *state_freq
         else
             generateRandomBaseFrequencies(state_freqs);
         tree->getModel()->setStateFrequency(state_freqs);
+        
+        // Minh's Q: why only decompose at this single one line?
+        // It should always be called 
         tree->getModel()->decomposeRateMatrix();
     }
 }
