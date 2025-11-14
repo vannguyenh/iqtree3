@@ -179,6 +179,9 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     cout << "Base model name: " << base_model->getName() << endl;
     // compute and install the genotype frequencies
     init_genotype_frequencies(freq_params);
+    
+    // BQM: This line is missing, that's why decomposeRateMatrix is not called
+    ModelMarkov::init(freq_type);
 }
 
 
