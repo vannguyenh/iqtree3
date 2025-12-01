@@ -57,10 +57,11 @@ void ModelGenotype::init_base_model(const char *base_model_name,
     }
     try {
         string base_model_str = base_model_name;
+        // We are not using freq from base_model, so initialise it FREQ_EQUAL
         if (ModelMarkov::validModelName(base_model_str))
-            base_model = ModelMarkov::getModelByName(base_model_str, phylo_tree, model_params, freq_type, freq_params_base_model);
+            base_model = ModelMarkov::getModelByName(base_model_str, phylo_tree, model_params, FREQ_EQUAL, freq_params_base_model);
         else
-            base_model = new ModelDNA(base_model_name, model_params, freq_type, freq_params_base_model, phylo_tree);
+            base_model = new ModelDNA(base_model_name, model_params, FREQ_EQUAL, freq_params_base_model, phylo_tree);
     }
     catch (string str) {
         cout << "Error during initialisation of the base model of Genotype. " << endl;
@@ -82,7 +83,7 @@ string ModelGenotype::getName() {
 
 void ModelGenotype::init_genotype_frequencies(string freq_params) {
     // this one is not base model, it should be defined as GT10
-    freq_type = base_model->freq_type;
+    //freq_type = base_model->freq_type;
     switch (freq_type) {
         case FREQ_EQUAL: //'+FQ'
             for (int i=0; i < num_states; i++)
@@ -268,18 +269,41 @@ void ModelGenotype::decomposeRateMatrix() {
 }
 
 int ModelGenotype::getNDim() {
-    return base_model->getNDim();
+    auto base_model_ndim = base_model->getNDim();
+    ASSERT(base_model->freq_type == FREQ_EQUAL);
+    if (freq_type == FREQ_ESTIMATE)
+        return base_model_ndim + (num_states-1);
+    return base_model_ndim;
 }
 
 void ModelGenotype::setVariables(double *variables) {
     base_model->setVariables(variables);
+    if (freq_type == FREQ_ESTIMATE) {
+        int ndim = getNDim();
+        memcpy(variables+(ndim-num_states+2), state_freq, (num_states-1)*sizeof(double));
+    }
 }
 
 bool ModelGenotype::getVariables(double *variables) {
-    return base_model->getVariables(variables);
+    bool changed;
+    changed = base_model->getVariables(variables);
+    if (freq_type == FREQ_ESTIMATE) {
+        int ndim = getNDim();
+        bool changed_freq = memcmpcpy(state_freq, variables+(ndim-num_states+2), (num_states-1)*sizeof(double));
+        changed = changed | changed_freq;
+    }
+    return changed;
 }
 
 void ModelGenotype::setBounds(double *lower_bound, double *upper_bound, bool *bound_check) {
     base_model->setBounds(lower_bound, upper_bound, bound_check);
+    if (freq_type == FREQ_ESTIMATE) {
+        int ndim = getNDim();
+        for (int i = 1; i < num_states; i++) {
+            lower_bound[i+ndim-num_states+1] = Params::getInstance().min_state_freq;
+            upper_bound[i+ndim-num_states+1] = 1.0;
+            bound_check[i+ndim-num_states+1] = false;
+        }
+    }
 }
 
