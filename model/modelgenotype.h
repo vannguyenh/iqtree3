@@ -92,8 +92,12 @@ public:
      * compute the frequencies of A C G T for the base model with 4 states
      * @param freq_params
      */
-    virtual string compute_freq_params_base_model(string freq_params);
+    virtual string computeFreqParamsOfBaseModel(string freq_params);
 
+    /**
+     * initialise the error model of the genotype models
+     */
+    double init_error_model();
     /**
      @return model name
      */
@@ -173,7 +177,25 @@ protected:
      * @return TRUE if parameters are changed, FALSE otherwise (2015-10-20)
      */
     virtual bool getVariables(double *variables);
-    
+
+    // Error model parameters
+    bool use_error_model;   // whether the error model is enabled
+    double ado_rate;        // allelic dropout rate
+    double error_rate;      // amplification/sequencing error rate
+    bool fix_error_params;  // whether to fix error parameters (not optimise)
+
+    /*
+     * Bounds for the optimisation
+     * lower_ado: lower bound for ADO - 0.0
+     * upper_ado: upper bound for ADO - 1.0
+     * lower_error: lower bound for ERR - 10^-5
+     * upper_error: upper bound for ERR - 10^-3
+     */
+    double lower_ado;
+    double upper_ado;
+    double lower_error;
+    double upper_error;
+
 };
 
 #endif
