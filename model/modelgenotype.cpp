@@ -53,7 +53,7 @@ void ModelGenotype::init_base_model(const char *base_model_name,
     if (freq_params.empty()) {
         freq_params_base_model = "";
     } else {
-        freq_params_base_model = compute_freq_params_base_model(freq_params);
+        freq_params_base_model = computeFreqParamsOfBaseModel(freq_params);
     }
     try {
         string base_model_str = base_model_name;
@@ -82,8 +82,6 @@ string ModelGenotype::getName() {
 }
 
 void ModelGenotype::init_genotype_frequencies(string freq_params) {
-    // this one is not base model, it should be defined as GT10
-    //freq_type = base_model->freq_type;
     switch (freq_type) {
         case FREQ_EQUAL: //'+FQ'
             for (int i=0; i < num_states; i++)
@@ -126,7 +124,7 @@ void ModelGenotype::init_genotype_frequencies(string freq_params) {
     ModelMarkov::setStateFrequency(state_freq);
 }
 
-string ModelGenotype::compute_freq_params_base_model(string freq_params) {
+string ModelGenotype::computeFreqParamsOfBaseModel(string freq_params) {
     std::vector<double> freq_prams_base_model(4, 0.0);
     std::vector<double> freq_params_vector;
 
@@ -176,11 +174,15 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     dna_states = 4;
     // Initialise the base model
     init_base_model(base_model_name.c_str(), model_params, freq_type, freq_params);
-    cout << "Initialised base genotype model of :"  << endl;
+    cout << "Initialised base genotype model of :" << gt_model_name  << endl;
     cout << "Base model name: " << base_model->getName() << endl;
     // compute and install the genotype frequencies
     init_genotype_frequencies(freq_params);
-    
+
+    // error model
+    if (gt_model_name.find("+E") != string::npos) {
+        init_error_model();
+    }
     // BQM: This line is missing, that's why decomposeRateMatrix is not called
     ModelMarkov::init(freq_type);
 }
@@ -235,7 +237,7 @@ void ModelGenotype::computeGenotypeRateMatrix() {
     ASSERT(is_reversible && "Genotype model does not work with non-reversible DNA base model yet");
     // rates has the size n*(n-1)/2 for reversible base DNA models
     int count = 0;
-    // decode the exchangebilities between 2 nucleotides in genotype
+    // decode the exchangeabilities between 2 nucleotides in genotype
     const int base_id[16] = {-1, 0, 1, 2, 0, -1, 3, 4, 1, 3, -1, 5, 2, 4, 5, -1};
     for (i = 0; i < num_states; i++)
         for (j = i+1; j < num_states; j++, count++) {
@@ -261,6 +263,10 @@ void ModelGenotype::computeGenotypeRateMatrix() {
                 *this_rate = 0.0;
             }
         }
+}
+
+double ModelGenotype::init_error_model() {
+    // TO DO: initialise the error model here
 }
 
 void ModelGenotype::decomposeRateMatrix() {
