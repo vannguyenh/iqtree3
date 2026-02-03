@@ -180,9 +180,16 @@ protected:
 
     // Error model parameters
     bool use_error_model;   // whether the error model is enabled
+    double **error_matrix; // [num_states][num_states] probability matrix
     double ado_rate;        // allelic dropout rate
     double error_rate;      // amplification/sequencing error rate
     bool fix_error_params;  // whether to fix error parameters (not optimise)
+
+    void computeErrorMatrix();
+    void free_error_matrix();
+    double computeErrorProbabilities(int true_state, int obs_state, double ado, double err);
+    bool is_heterozygote(int state);
+    void getAlleles(int state, int &allele1, int &allele2);
 
     /*
      * Bounds for the optimisation
