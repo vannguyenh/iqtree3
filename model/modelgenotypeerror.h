@@ -19,9 +19,8 @@
  * 1. Allelic Dropout (ADO) - delta parameter
  * 2. Amplification/Sequencing Error (ERR) - epsilon parameter
  */
+class ModelGenotypeError : public ModelGenotype {
 
-class ModelGenotypeError : virtual public ModelGenotype
-{
 public:
     /**
      * Constructor

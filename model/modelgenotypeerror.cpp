@@ -240,7 +240,6 @@ double ModelGenotypeError::computeErrorProb(int true_state, int obs_state) {
             }
         }
     }
-
     return prob;
 }
 
