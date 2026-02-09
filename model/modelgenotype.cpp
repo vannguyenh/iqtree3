@@ -420,7 +420,7 @@ double ModelGenotype::computeErrorProbabilities(int true_state, int obs_state, d
                 prob = 0.0;
         }
     }
-    // UNPHASED GENOTYPTES (GT10)
+    // UNPHASED GENOTYPES (GT10)
     else if (num_states == 10) {
         // True genotype is HOMOZYGOUS (a/a)
         if (!is_het_true) {
@@ -432,7 +432,7 @@ double ModelGenotype::computeErrorProbabilities(int true_state, int obs_state, d
             else if (is_het_obs && (a1_obs == a1_true || a1_obs == a2_true || a2_obs == a1_true || a2_obs == a2_true)) {
                 prob = (1 - ado) * err / 3.0;
             }
-            // Case 3: P(b/b | a/a) where b differes from a and different homozygotes
+            // Case 3: P(b/b | a/a) where b differs from a and different homozygotes
             else if (!is_het_obs && a1_true != a1_obs) {
                 prob = ado * err / 6.0;
             } else
@@ -450,7 +450,7 @@ double ModelGenotype::computeErrorProbabilities(int true_state, int obs_state, d
             } else if (is_het_obs) {
                 bool same_het = ((a1_obs == a1_true && a2_obs == a2_true) || (a1_obs == a2_true && a2_obs == a1_true));
                 if (same_het) {
-                    // Case 6: Same heterozygote
+                    // Case 6: Same heterozygote P(a/b | a/b)
                     prob = (1 - ado) * (1 - err);
                 } else {
                     int matches = 0;
