@@ -31,17 +31,8 @@
 
 
 ModelGenotype::ModelGenotype(PhyloTree *tree) : ModelMarkov(tree) {
-    use_error_model = false;
-    ado_rate = 0.0;
-    error_rate = 0.0;
-    fix_error_params = false;
-    error_matrix = nullptr;
-
-    // Set bounds
-    lower_ado = 0.0;
-    upper_ado = 1.0;
-    lower_error = 0.0;
-    upper_error = 1.0;
+    base_model = nullptr;
+    dna_states = 4;
 }
 
 ModelGenotype::ModelGenotype(const char *model_name,
@@ -49,8 +40,17 @@ ModelGenotype::ModelGenotype(const char *model_name,
                              StateFreqType freq_type,
                              string freq_params,
                              PhyloTree *tree)
-: ModelMarkov(tree, true) {
-	init(model_name, model_params, freq_type, freq_params);
+: ModelMarkov(tree) {
+    base_model = nullptr;
+    dna_states = 4;
+    init(model_name, model_params, freq_type, freq_params);
+}
+
+ModelGenotype::~ModelGenotype() {
+    if (base_model) {
+        delete base_model;
+        base_model = nullptr;
+    }
 }
 
 void ModelGenotype::init_base_model(const char *base_model_name,
@@ -189,17 +189,8 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     // compute and install the genotype frequencies
     init_genotype_frequencies(freq_params);
 
-    // error model
-    if (gt_model_name.find("+E") != string::npos) {
-        init_error_model();
-    }
     // BQM: This line is missing, that's why decomposeRateMatrix is not called
     ModelMarkov::init(freq_type);
-}
-
-ModelGenotype::~ModelGenotype() {
-    delete base_model;
-    free_error_matrix();
 }
 
 void ModelGenotype::setCheckpoint(Checkpoint *checkpoint) {
@@ -215,14 +206,6 @@ void ModelGenotype::saveCheckpoint() {
     startCheckpoint();
     base_model->saveCheckpoint();
     CKP_ARRAY_SAVE(dna_states, base_model->state_freq);
-
-    // error model
-    if (use_error_model) {
-        CKP_SAVE(ado_rate);
-        CKP_SAVE(error_rate);
-        CKP_SAVE(fix_error_params);
-    }
-
     endCheckpoint();
     ModelMarkov::saveCheckpoint();
 }
@@ -230,30 +213,25 @@ void ModelGenotype::saveCheckpoint() {
 void ModelGenotype::restoreCheckpoint() {
     // Restore genotype-level state (sizes, state_freq for 10/16 states)
     ModelMarkov::restoreCheckpoint();
-
     startCheckpoint();
     CKP_ARRAY_RESTORE(dna_states, base_model->state_freq);
-    if (use_error_model) {
-        CKP_RESTORE(ado_rate);
-        CKP_RESTORE(error_rate);
-        CKP_RESTORE(fix_error_params);
-        computeErrorMatrix();
-    }
     // Restore the base DNA model (4-state)
     base_model->restoreCheckpoint();
     endCheckpoint();
 
     // Ensure we are back in genotype state space before any Eigen allocations
     phylo_tree->aln->num_states = num_states;
-
     // Make sure base_model’s internal matrices/rates are ready before we use them
     base_model->decomposeRateMatrix();
-
     // Build genotype Q and decompose
     computeGenotypeRateMatrix();
     ModelMarkov::decomposeRateMatrix();
-
     if (phylo_tree) phylo_tree->clearAllPartialLH();
+}
+
+void ModelGenotype::computeTipLikelihood(PML::StateType state, double *state_lk) {
+    // Call the parent class - no error model included here
+    ModelMarkov::computeTipLikelihood(state, state_lk);
 }
 
 void ModelGenotype::computeGenotypeRateMatrix() {
@@ -288,79 +266,6 @@ void ModelGenotype::computeGenotypeRateMatrix() {
         }
 }
 
-double ModelGenotype::init_error_model() {
-    // TO DO: initialise the error model here
-    cout << "Initalising error model (+E)" << endl;
-
-    use_error_model = true;
-    // Set bounds
-    lower_ado = 0.0;
-    upper_ado = 1.0;
-    lower_error = 0.0;
-    upper_error = 1.0;
-
-    // Set initial parameter values
-    // These will be optimised during ML search
-    ado_rate = 0.5; // Initial ADO rate (50%)
-    error_rate = 0.05; // Initial error rate (0.01%)
-
-    cout << " Initial ADO rate (delta): " << ado_rate << endl;
-    cout << " Initial error rate (epsilon): " << error_rate << endl;
-    cout << " ADO bounds: [" << lower_ado << ", " << upper_ado << "]" << endl;
-    cout << " Error bounds: [" << lower_error << ", " << upper_error << "]" << endl;
-
-    // By default, optimize both parameters
-    fix_error_params = false;
-
-    // Allocate and compute error matrix
-    computeErrorMatrix();
-
-    return 0.0;
-}
-
-void ModelGenotype::free_error_matrix() {
-    if (error_matrix) {
-        for (int i = 0; i < num_states; i++) {
-            delete[] error_matrix[i];
-        }
-        delete[] error_matrix;
-        error_matrix = nullptr;
-    }
-}
-
-void ModelGenotype::computeErrorMatrix() {
-    // Free existing matrix if present
-    free_error_matrix();
-
-    // Allocate the matrix
-    error_matrix = new double *[num_states];
-    for (int i = 0; i < num_states; i++) {
-        error_matrix[i] = new double[num_states];
-    }
-
-    // Compute error probabilities for all state pairs
-    for (int true_state = 0; true_state < num_states; true_state++) {
-        for (int obs_state = 0; obs_state < num_states; obs_state++) {
-            error_matrix[true_state][obs_state] = computeErrorProbabilities(true_state, obs_state, ado_rate, error_rate);
-        }
-    }
-
-    // Verify matrix rows sum to resonable values (row_sum == 1.0)
-    if (verbose_mode >= VB_MED) {
-        cout << "Error matrix computed with ADO=" << ado_rate << ", error=" << error_rate << endl;
-
-        for (int true_state = 0; true_state < num_states; true_state++) {
-            double row_sum = 0.0;
-            for (int obs_state = 0; obs_state < num_states; obs_state++) {
-                row_sum += error_matrix[true_state][obs_state];
-            }
-            if (row_sum < 0.99 || row_sum > 1.01) {
-                cout << "Warning: Error matrix row " << true_state << " sums to " << row_sum << endl;
-            }
-        }
-    }
-}
-
 bool ModelGenotype::is_heterozygote(int state) {
     ASSERT(state >= 0 && state < num_states);
     auto a1 = gt_nt_map[state].first;
@@ -374,100 +279,6 @@ void ModelGenotype::getAlleles(int state, int &allele1, int &allele2) {
     allele2 = gt_nt_map[state].second;
 }
 
-double ModelGenotype::computeErrorProbabilities(int true_state, int obs_state, double ado, double err) {
-    // Get alleles for true and observed states
-    int a1_true, a2_true, a1_obs, a2_obs;
-    getAlleles(true_state, a1_true, a2_true);
-    getAlleles(obs_state, a1_obs, a2_obs);
-
-    bool is_het_true = is_heterozygote(true_state);
-    bool is_het_obs = is_heterozygote(obs_state);
-
-    double prob = 0.0;
-
-    // PHASED GENOTYPES (GT16)
-    if (num_states == 16) {
-        // True genotype is HOMOZYGOUS (a|a)
-        if (!is_het_true) {
-            if (!is_het_obs && a1_true == a1_obs && a2_true == a2_obs) {
-                // Case 1: P(a|a | a|a) - same homozygotes
-                // 1 - e + 1/2 * a * e
-                prob = 1.0 - err + 0.5 * ado * err;
-            } else if (is_het_obs && (a1_true == a1_obs || a2_true == a2_obs) ) {
-                // Case 2: P(a|b | a|a) or P(b|a | a|a) - true homozygote to observed heterozygote
-                // (1 - ado) * 1/6 * err
-                prob = (1 - ado) *  err / 6.0;
-            } else if (!is_het_obs && a1_true != a1_obs) {
-                // Case 3: P(b|b | a|a) - different homozygote
-                // 1/6 * ado * err
-                prob = ado * err / 6.0;
-            } else
-                prob = 0.0;
-        } else { // True genotype is HETEROZYGOTE
-            if (!is_het_obs && ( a1_true == a1_obs || a2_true == a2_obs)) {
-                // Case 4: P(a|a | a|b) - true heterozygote to observed homozygote
-                prob = 0.5 * ado + (err / 6.0) - (ado * err / 3.0);
-            } else if (!is_het_obs && a1_true != a1_obs && a2_true != a2_obs) {
-                // Case 5: P(c|c | a|b) - true heterozygote to observed homozygote of different base
-                prob = ado * err / 6.0;
-            } else if (is_het_obs && (a1_true == a1_obs || a2_true == a2_obs)) {
-                // Case 6: P(a|c | a|b) - true heterozygote to another heterozygote
-                prob = (1 - ado) * err / 6.0;
-            } else if (is_het_obs && (a1_true == a1_obs && a2_true == a2_obs)) {
-                // Case 7: P(a|b | a|b) - true and observed heterozygote the same -- No error rate
-                prob = (1 - ado) * (1 - err);
-            } else
-                prob = 0.0;
-        }
-    }
-    // UNPHASED GENOTYPES (GT10)
-    else if (num_states == 10) {
-        // True genotype is HOMOZYGOUS (a/a)
-        if (!is_het_true) {
-            // Case 1: P(a/a | a/a) -- same homozygote
-            if (!is_het_obs && a1_true == a1_obs) {
-                prob = 1.0 - err + 0.5 * ado * err;
-            }
-            // Case 2: P(a/b | a/a) where b differs from a
-            else if (is_het_obs && (a1_obs == a1_true || a1_obs == a2_true || a2_obs == a1_true || a2_obs == a2_true)) {
-                prob = (1 - ado) * err / 3.0;
-            }
-            // Case 3: P(b/b | a/a) where b differs from a and different homozygotes
-            else if (!is_het_obs && a1_true != a1_obs) {
-                prob = ado * err / 6.0;
-            } else
-                prob = 0.0;
-        }
-        // True genotype is HETEROZYGOTE (a/b)
-        else {
-            // Case 4: P(a/a | a/b) - observed homozygote matching one allele of true heterozygote
-            if (!is_het_obs && (a1_obs == a1_true || a1_obs == a2_true)) {
-                prob = 0.5 * ado + (err / 6.0) - (ado * err / 3.0);
-            }
-            // Case 5: P(c/c | a/b)
-            else if (!is_het_obs && a1_obs != a1_true && a1_obs != a2_true) {
-                prob = ado * err / 6.0;
-            } else if (is_het_obs) {
-                bool same_het = ((a1_obs == a1_true && a2_obs == a2_true) || (a1_obs == a2_true && a2_obs == a1_true));
-                if (same_het) {
-                    // Case 6: Same heterozygote P(a/b | a/b)
-                    prob = (1 - ado) * (1 - err);
-                } else {
-                    int matches = 0;
-                    if (a1_obs == a1_true || a1_obs == a2_true) matches++;
-                    if (a2_obs == a2_true || a2_obs == a1_true) matches++;
-
-                    if (matches == 1)
-                        prob = (1.0 - ado) * err / 6.0;
-                    else
-                        prob = 0.0;
-                }
-            }
-        }
-    }
-    return prob;
-}
-
 void ModelGenotype::decomposeRateMatrix() {
     computeGenotypeRateMatrix();
     ModelMarkov::decomposeRateMatrix();
@@ -476,32 +287,16 @@ void ModelGenotype::decomposeRateMatrix() {
 int ModelGenotype::getNDim() {
     auto base_model_ndim = base_model->getNDim();
     ASSERT(base_model->freq_type == FREQ_EQUAL);
-
-    int extra_dims = 0;
-
     if (freq_type == FREQ_ESTIMATE)
-        extra_dims += (num_states-1);
-        //return base_model_ndim + (num_states-1);
-    //return base_model_ndim;
-
-    if (use_error_model && !fix_error_params)
-        extra_dims += 2;
-
-    return base_model_ndim + extra_dims;
+        return base_model_ndim + (num_states-1);
+    return base_model_ndim;
 }
 
 void ModelGenotype::setVariables(double *variables) {
     base_model->setVariables(variables);
-
     if (freq_type == FREQ_ESTIMATE) {
         int ndim = getNDim();
         memcpy(variables+(ndim-num_states+2), state_freq, (num_states-1)*sizeof(double));
-    }
-
-    if (use_error_model && !fix_error_params) {
-        int ndim = getNDim();
-        variables[ndim -2] = ado_rate;
-        variables[ndim -1] = error_rate;
     }
 }
 
@@ -513,18 +308,6 @@ bool ModelGenotype::getVariables(double *variables) {
         int ndim = getNDim();
         bool changed_freq = memcmpcpy(state_freq, variables+(ndim-num_states+2), (num_states-1)*sizeof(double));
         changed = changed | changed_freq;
-    }
-    if (use_error_model && !fix_error_params) {
-        int ndim = getNDim();
-        double new_ado = variables[ndim - 2];
-        double new_err = variables[ndim - 1];
-
-        if (fabs(new_ado - ado_rate) > 1e-10 || fabs(new_err - error_rate) > 1e-10) {
-            ado_rate = new_ado;
-            error_rate = new_err;
-            computeErrorMatrix();
-            changed = true;
-        }
     }
     return changed;
 }
@@ -540,18 +323,5 @@ void ModelGenotype::setBounds(double *lower_bound, double *upper_bound, bool *bo
             bound_check[i+ndim-num_states+1] = false;
         }
     }
-
-    if (use_error_model && !fix_error_params) {
-        int ndim = getNDim();
-
-        lower_bound[ndim - 2] = lower_ado;
-        upper_bound[ndim - 2] = upper_ado;
-        bound_check[ndim - 2] = false;
-
-        lower_bound[ndim - 1] = lower_error;
-        upper_bound[ndim - 1] = upper_error;
-        bound_check[ndim - 1] = false;
-    }
-    cout << "Error params: ADO=" << ado_rate << ", error=" << error_rate << endl;
 }
 

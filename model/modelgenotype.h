@@ -33,7 +33,7 @@ Model for genotype matrix data
 
 	@author Van Nguyen Hoang <van.nguyenhoang@anu.edu.au>
 */
-class ModelGenotype : virtual public ModelMarkov
+class ModelGenotype : public ModelMarkov
 {
 public:
 	/**
@@ -42,7 +42,7 @@ public:
         ModelSubst():
         - allocates state_freq[tree->aln->num_states]
         ModelMarkov():
-        - allocateds rates[getNumRateEntries()] = rates[n*n(n-1)/2];
+        - allocates rates[getNumRateEntries()] = rates[n*n(n-1)/2];
         - allocates eigenvalues and eigenvectors.
      
 		@param model_name model name, e.g., JC, HKY,etc. + GT10, GT16
@@ -95,18 +95,9 @@ public:
     virtual string computeFreqParamsOfBaseModel(string freq_params);
 
     /**
-     * initialise the error model of the genotype models
-     */
-    double init_error_model();
-    /**
      @return model name
      */
     virtual string getName();
-    
-	/**
-	 * @return model name with parameters in form of e.g. GTR{a,b,c,d,e,f}
-	 */
-    //virtual string getNameParams(bool show_fixed_params = false);
 
     /**
         set checkpoint object
@@ -128,6 +119,12 @@ public:
         Restore object from the checkpoint.
     */
     virtual void restoreCheckpoint();
+
+    /** compute the tip likelihood vector of a state for Felsenstein's pruning algorithm
+     @param state character state
+     @param[out] state_lk state likehood vector of size num_states
+     */
+    virtual void computeTipLikelihood(PML::StateType state, double *state_lk);
 
     /** main function to compute rate matrix
         @param rate_matrix (OUT) Full rate matrix Q is filled with rate matrix entries
@@ -177,32 +174,9 @@ protected:
      * @return TRUE if parameters are changed, FALSE otherwise (2015-10-20)
      */
     virtual bool getVariables(double *variables);
-
-    // Error model parameters
-    bool use_error_model;   // whether the error model is enabled
-    double **error_matrix; // [num_states][num_states] probability matrix
-    double ado_rate;        // allelic dropout rate
-    double error_rate;      // amplification/sequencing error rate
-    bool fix_error_params;  // whether to fix error parameters (not optimise)
-
-    void computeErrorMatrix();
-    void free_error_matrix();
-    double computeErrorProbabilities(int true_state, int obs_state, double ado, double err);
+    // Helper methods used by both ModelGenotype and ModelGenotypeError
     bool is_heterozygote(int state);
     void getAlleles(int state, int &allele1, int &allele2);
-
-    /*
-     * Bounds for the optimisation
-     * lower_ado: lower bound for ADO - 0.0
-     * upper_ado: upper bound for ADO - 1.0
-     * lower_error: lower bound for ERR - 10^-5
-     * upper_error: upper bound for ERR - 10^-3
-     */
-    double lower_ado;
-    double upper_ado;
-    double lower_error;
-    double upper_error;
-
 };
 
 #endif
