@@ -18,6 +18,7 @@
 //#include "phylokernelmixture.h"
 #include "modelpomomixture.h"
 #include "modelgenotype.h"
+#include "modelgenotypeerror.h"
 
 using namespace std;
 
@@ -1059,33 +1060,47 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
     
     // Parse model for genotypes.
     bool genotype = false;
-    string genotype_rate_str = "";
-    string genotype_subrates = "";
     string model_genotype = "";
     string::size_type gt_pos = posGENOTYPE(model_str);
     genotype = (gt_pos != string::npos);
-    // if the model contains +GT1* -> extract Genotype models
-    if (genotype) {
-        model_genotype = model_str.substr(gt_pos);
-        model_str = model_str.substr(0, gt_pos);
-    }
+
     // sequencing error model
     string seqerr = "";
-    string::size_type spec_pos;
-    while ((spec_pos = model_str.find("+E")) != string::npos) {
-        string::size_type end_pos = model_str.find_first_of("+*", spec_pos+1);
-        if (end_pos == string::npos) {
-            seqerr = model_str.substr(spec_pos);
-            model_str = model_str.substr(0, spec_pos);
-        } else {
-            seqerr = model_str.substr(spec_pos, end_pos - spec_pos);
-            model_str = model_str.substr(0, spec_pos) + model_str.substr(end_pos);
+
+    // if the model contains +GT1* -> extract Genotype models and check for +E
+    if (genotype) {
+        model_genotype = model_str.substr(gt_pos); // +GT10+E
+        model_str = model_str.substr(0, gt_pos); // HKY or GTR (case of GT10+E)
+
+        // Check for genotype model has error model
+        string::size_type e_pos = model_genotype.find("+E");
+        if (e_pos != string::npos) {
+            string::size_type end_pos = model_genotype.find_first_of("+*", e_pos+1);
+            if (end_pos == string::npos) {
+                seqerr = model_genotype.substr(e_pos);
+                model_genotype = model_genotype.substr(0, e_pos);
+            } else {
+                seqerr = model_genotype.substr(end_pos, end_pos - e_pos);
+                model_genotype = model_genotype.substr(0, e_pos) + model_genotype.substr(end_pos);
+            }
+        }
+    } else {
+        // For non-genotype models (DNA), check for +E in main model string
+        string::size_type spec_pos;
+        while ((spec_pos = model_str.find("+E")) != string::npos) {
+            string::size_type end_pos = model_str.find_first_of("+*", spec_pos+1);
+            if (end_pos == string::npos) {
+                seqerr = model_str.substr(spec_pos);
+                model_str = model_str.substr(0, spec_pos);
+            } else {
+                seqerr = model_str.substr(spec_pos, end_pos - spec_pos);
+                model_str = model_str.substr(0, spec_pos) + model_str.substr(end_pos);
+            }
         }
     }
 
-    
-    if (!seqerr.empty() && tree->aln->seq_type != SEQ_DNA) {
-        outError("Sequencing error model " + seqerr + " is only supported for DNA");
+    if (!seqerr.empty() && tree->aln->seq_type != SEQ_DNA && tree->aln->seq_type != SEQ_GENOTYPE) {
+        outError("Sequencing error model " + seqerr + " is only supported for DNA and Genotype");
     }
     // Now that PoMo/Genotype stuff has been removed, check for model parameters.
 	size_t pos = model_str.find(OPEN_BRACKET);
@@ -1170,10 +1185,11 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
 	} else if (tree->aln->seq_type == SEQ_MORPH) {
         model = new ModelMorphology(model_str.c_str(), model_params, freq_type, freq_params, tree);
     } else if (tree->aln->seq_type == SEQ_GENOTYPE) {
-        if (genotype_rate_str == "")
+        if (seqerr.empty())
             model = new ModelGenotype(model_str.c_str(), model_params, freq_type, freq_params, tree);
         else
-            outError("Sorry! We have not supported rate heterogeneity model for genotype type.");
+            model = new ModelGenotypeError(model_str.c_str(), model_params, freq_type, freq_params, seqerr, tree);
+            //outError("Sorry! We have not supported rate heterogeneity model for genotype type.");
     } else {
 		outError("Unsupported model type");
 	}
