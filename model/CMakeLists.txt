@@ -1,9 +1,10 @@
 add_library(model
 modelmarkov.cpp modelmarkov.h
 modelbin.cpp modelbin.h
-modelgenotype.cpp modelgenotype.h
 modeldna.cpp modeldna.h
 modeldnaerror.cpp modeldnaerror.h
+modelgenotype.cpp modelgenotype.h
+modelgenotypeerror.cpp modelgenotypeerror.h
 modelfactory.cpp modelfactory.h
 modelprotein.cpp modelprotein.h
 modelset.cpp modelset.h
