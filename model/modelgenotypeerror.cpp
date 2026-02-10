@@ -249,6 +249,11 @@ void ModelGenotypeError::computeTipLikelihood(PML::StateType state, double *stat
         return ModelGenotype::computeTipLikelihood(state, state_lk);
     }
 
+    // Handle ambiguous or missing data - delegate to parent class
+    if (state >= num_states) {
+        return ModelGenotype::computeTipLikelihood(state, state_lk);
+    }
+
     // For each possible true genotype, compute P(observed | true)
     for (int true_state = 0; true_state < num_states; true_state++) {
         state_lk[true_state] = computeErrorProb(true_state, (int)state);
@@ -257,56 +262,46 @@ void ModelGenotypeError::computeTipLikelihood(PML::StateType state, double *stat
 
 void ModelGenotypeError::setBounds(double *lower_bound, double *upper_bound, bool *bound_check) {
     ModelGenotype::setBounds(lower_bound, upper_bound, bound_check);
-
-    int base_ndim = ModelGenotype::getNDim();
-    int offset = base_ndim;
-
+    int id = ModelGenotype::getNDim()+1;
     if (!fix_delta) {
-        lower_bound[offset] = MIN_DELTA;
-        upper_bound[offset] = MAX_DELTA;
-        bound_check[offset] = false;
-        offset++;
+        lower_bound[id] = MIN_DELTA;
+        upper_bound[id] = MAX_DELTA;
+        bound_check[id] = false;
+        id++;
     }
 
     if (!fix_epsilon) {
-        lower_bound[offset] = MIN_EPSILON;
-        upper_bound[offset] = MAX_EPSILON;
-        bound_check[offset] = false;
+        lower_bound[id] = MIN_EPSILON;
+        upper_bound[id] = MAX_EPSILON;
+        bound_check[id] = false;
     }
 }
 
 bool ModelGenotypeError::getVariables(double *variables) {
     bool changed = ModelGenotype::getVariables(variables);
 
-    int base_ndim = ModelGenotype::getNDim();
-    int offset = base_ndim;
-
+    int id = ModelGenotype::getNDim()+1;
     if (!fix_delta) {
-        changed |= (delta != variables[offset]);
-        delta = variables[offset];
-        offset++;
+        changed |= (delta != variables[id]);
+        delta = variables[id];
+        id++;
     }
-
     if (!fix_epsilon) {
-        changed |= (epsilon != variables[offset]);
-        epsilon = variables[offset];
+        changed |= (epsilon != variables[id]);
+        epsilon = variables[id];
     }
-
     return changed;
 }
 
 void ModelGenotypeError::setVariables(double *variables) {
     ModelGenotype::setVariables(variables);
-
-    int base_ndim = ModelGenotype::getNDim();
-    int offset = base_ndim;
+    int id = ModelGenotype::getNDim()+1;
 
     if (!fix_delta) {
-        variables[offset] = delta;
-        offset++;
+        variables[id] = delta;
+        id++;
     }
-
     if (!fix_epsilon) {
-        variables[offset] = epsilon;
+        variables[id] = epsilon;
     }
 }
