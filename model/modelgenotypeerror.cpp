@@ -139,108 +139,67 @@ double ModelGenotypeError::computeErrorProb(int true_state, int obs_state) {
     bool is_het_true = is_heterozygote(true_state);
     bool is_het_obs = is_heterozygote(obs_state);
 
-    double prob = 0.0;
     double ado = delta;
     double err = epsilon;
 
-    // PHASED GENOTYPES (GT16)
-    if (num_states == 16) {
-        // True genotype is HOMOZYGOUS (a|a)
-        if (!is_het_true) {
-            if (!is_het_obs && a1_true == a1_obs && a2_true == a2_obs) {
-                // Case I: P(a|a | a|a) = 1 - ε + ½δε
-                prob = 1.0 - err + 0.5 * ado * err;
-            }
-            else if (is_het_obs && (a1_true == a1_obs || a2_true == a2_obs)) {
-                // Case II: P(a|b | a|a) = (1 - δ) * ⅙ε
-                prob = (1.0 - ado) * err / 6.0;
-            }
-            else if (!is_het_obs && a1_true != a1_obs) {
-                // Case III: P(b|b | a|a) = ⅙δε
-                prob = ado * err / 6.0;
-            }
-            else {
-                prob = 0.0;
-            }
-        }
-        // True genotype is HETEROZYGOTE (a|b)
-        else {
-            if (!is_het_obs && (a1_true == a1_obs || a2_true == a2_obs)) {
-                // Case IV: P(a|a | a|b) = ½δ + ⅙ε - ⅓δε
-                prob = 0.5 * ado + (err / 6.0) - (ado * err / 3.0);
-            }
-            else if (!is_het_obs && a1_true != a1_obs && a2_true != a2_obs) {
-                // Case V: P(c|c | a|b) = ⅙δε
-                prob = ado * err / 6.0;
-            }
-            else if (is_het_obs && (a1_true == a1_obs || a2_true == a2_obs) &&
-                     !(a1_true == a1_obs && a2_true == a2_obs)) {
-                // Case VI: P(a|c | a|b) = (1 - δ) * ⅙ε
-                prob = (1.0 - ado) * err / 6.0;
-            }
-            else if (is_het_obs && a1_true == a1_obs && a2_true == a2_obs) {
-                // Case VII: P(a|b | a|b) = (1 - δ)(1 - ε)
-                prob = (1.0 - ado) * (1.0 - err);
-            }
-            else {
-                prob = 0.0;
-            }
-        }
-    }
-    // UNPHASED GENOTYPES (GT10)
-    else if (num_states == 10) {
-        // True genotype is HOMOZYGOUS (a/a)
-        if (!is_het_true) {
-            if (!is_het_obs && a1_true == a1_obs) {
-                // Case I: P(a/a | a/a) = 1 - ε + ½δε
-                prob = 1.0 - err + 0.5 * ado * err;
-            }
-            else if (is_het_obs && (a1_obs == a1_true || a1_obs == a2_true ||
-                                    a2_obs == a1_true || a2_obs == a2_true)) {
-                // Case II: P(a/b | a/a) = (1 - δ) * ⅓ε
-                prob = (1.0 - ado) * err / 3.0;
-            }
-            else if (!is_het_obs && a1_true != a1_obs) {
-                // Case III: P(b/b | a/a) = ⅙δε
-                prob = ado * err / 6.0;
-            }
-            else {
-                prob = 0.0;
-            }
-        }
-        // True genotype is HETEROZYGOTE (a/b)
-        else {
-            if (!is_het_obs && (a1_obs == a1_true || a1_obs == a2_true)) {
-                // Case IV: P(a/a | a/b) = ½δ + ⅙ε - ⅓δε
-                prob = 0.5 * ado + (err / 6.0) - (ado * err / 3.0);
-            }
-            else if (!is_het_obs && a1_obs != a1_true && a1_obs != a2_true) {
-                // Case V: P(c/c | a/b) = ⅙δε
-                prob = ado * err / 6.0;
-            }
-            else if (is_het_obs) {
-                bool same_het = ((a1_obs == a1_true && a2_obs == a2_true) ||
-                                (a1_obs == a2_true && a2_obs == a1_true));
+    // Count allele matches between true and observed
+    int matches = 0;
+    bool a1_match = (a1_obs == a1_true || a1_obs == a2_true);
+    bool a2_match = (a2_obs == a1_true || a2_obs == a2_true);
+    if (a1_match) matches++;
+    if (a2_match) matches++;
 
-                if (same_het) {
-                    // Case VII: P(a/b | a/b) = (1 - δ)(1 - ε)
-                    prob = (1.0 - ado) * (1.0 - err);
-                } else {
-                    // Case VI: P(a/c | a/b) = (1 - δ) * ⅙ε
-                    int matches = 0;
-                    if (a1_obs == a1_true || a1_obs == a2_true) matches++;
-                    if (a2_obs == a2_true || a2_obs == a1_true) matches++;
+    // For unphased genotypes, order doesn't matter
+    bool exact_match = (num_states == 10) ?
+        ((a1_obs == a1_true && a2_obs == a2_true) || (a1_obs == a2_true && a2_obs == a1_true)) :
+        (a1_obs == a1_true && a2_obs == a2_true);
 
-                    if (matches == 1) {
-                        prob = (1.0 - ado) * err / 6.0;
-                    } else {
-                        prob = 0.0;
-                    }
-                }
-            }
-        }
+    // ----- Case I: Homozygous true → Homozygous observed (same allele) -----
+    if (!is_het_true && !is_het_obs && a1_true == a1_obs) {
+        // P(a/a | a/a) = 1 - err + 1/2 * ado * err
+        return 1.0 - err + 0.5 * ado * err;
     }
-    return prob;
+
+    // ----- Case II: Homozygous true → Heterozygous observed (one allele matches) -----
+    if (!is_het_true && is_het_obs && (a1_obs == a1_true || a2_obs == a1_true)) {
+        // GT16: P(a|b | a|a) = (1 - ado) × err / 6.0
+        // GT10: P(a/b | a/a) = (1 - ado) × err / 3.0
+        double factor = (num_states == 16) ? 6.0 : 3.0;
+        return (1.0 - ado) * err / factor;
+    }
+
+    // ----- Case III: Homozygous true → Homozygous observed (different allele) -----
+    if (!is_het_true && !is_het_obs && a1_true != a1_obs) {
+        // P(b/b | a/a) = 1/ 6 * ado * err
+        return ado * err / 6.0;
+    }
+
+    // ----- Case IV: Heterozygous true → Homozygous observed (one allele matches) -----
+    if (is_het_true && !is_het_obs && (a1_obs == a1_true || a1_obs == a2_true)) {
+        // P(a/a | a/b) = 1/2 * ado + 1/6 * err - 1/3 * ado * err
+        return 0.5 * ado + err / 6.0 - ado * err / 3.0;
+    }
+
+    // ----- Case V: Heterozygous true → Homozygous observed (no allele matches) -----
+    if (is_het_true && !is_het_obs && a1_obs != a1_true && a1_obs != a2_true) {
+        // P(c/c | a/b) = 1/6 * ado * err
+        return ado * err / 6.0;
+    }
+
+    // ----- Case VI: Heterozygous true → Heterozygous observed (one allele matches) -----
+    if (is_het_true && is_het_obs && matches == 1) {
+        // P(a/c | a/b) = (1 - ado) × 1/6 * err
+        return (1.0 - ado) * err / 6.0;
+    }
+
+    // ----- Case VII: Heterozygous true → Heterozygous observed (both alleles match) -----
+    if (is_het_true && is_het_obs && exact_match) {
+        // P(a/b | a/b) = (1 - ado)(1 - err)
+        return (1.0 - ado) * (1.0 - err);
+    }
+
+    // All other cases: impossible transitions
+    return 0.0;
 }
 
 void ModelGenotypeError::computeTipLikelihood(PML::StateType state, double *state_lk) {
