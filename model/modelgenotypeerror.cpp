@@ -6,7 +6,7 @@
 
 // Bounds for allele drop out error probability (delta)
 #define MIN_DELTA 0
-#define MAX_DELTA 0.9
+#define MAX_DELTA 0.99
 
 // Bounds for sequencing error probability (epsilon)
 #define MIN_EPSILON 0.0001
@@ -70,9 +70,6 @@ ModelGenotypeError::ModelGenotypeError(const char *model_name,
 
         error_name = error_spec.substr(0, pos);
     }
-}
-
-ModelGenotypeError::~ModelGenotypeError() {
 }
 
 void ModelGenotypeError::startCheckpoint() {

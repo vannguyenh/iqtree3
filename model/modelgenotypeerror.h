@@ -45,11 +45,6 @@ public:
                        PhyloTree *tree);
 
     /**
-     * Destructor
-     */
-    virtual ~ModelGenotypeError();
-
-    /**
      * Get model name
      */
     virtual string getName();
