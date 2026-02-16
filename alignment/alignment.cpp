@@ -35,7 +35,7 @@ using namespace Eigen;
 char symbols_protein[] = "ARNDCQEGHILKMFPSTWYVX"; // X for unknown AA
 char symbols_dna[]     = "ACGT";
 char symbols_rna[]     = "ACGU";
-char symbols_genotype[]      = "ACGTMRWSYK!\"@$%&";
+char symbols_genotype[]      = "ACGTMRWSYK!\"#$%&";
 //char symbols_binary[]  = "01";
 char symbols_morph[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
 // genetic code from tri-nucleotides (AAA, AAC, AAG, AAT, ..., TTT) to amino-acids
