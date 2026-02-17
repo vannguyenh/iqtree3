@@ -689,24 +689,52 @@ void AliSimulator::getStateFrequenciesFromModel(IQTree* tree, double *state_freq
     // get user-defined base frequencies (if any)
     else if ((tree->getModel()->getFreqType() == FREQ_USER_DEFINED)
              || (tree->getModel()->getFreqType() == FREQ_EQUAL)
-        || (ModelLieMarkov::validModelName(tree->getModel()->getName()))
+             || (ModelLieMarkov::validModelName(tree->getModel()->getName()))
              || tree->aln->seq_type == SEQ_CODON
-             //|| tree->aln->seq_type == SEQ_GENOTYPE
              || (tree->getModel()->getFreqType() == FREQ_EMPIRICAL && params->alisim_inference_mode))
         tree->getModel()->getStateFrequency(state_freqs);
     else // otherwise, randomly generate the base frequencies
     {
-        
         // if sequence_type is dna -> randomly generate base frequencies based on empirical distributions
         if (tree->aln->seq_type == SEQ_DNA)
             random_frequencies_from_distributions(state_freqs);
+        // if sequence_type is genotype -> use biologically realistic frequencies
+        else if (tree->aln->seq_type == SEQ_GENOTYPE)
+        {
+            double hom_ratio = 0.90;
+            double het_ratio = 1.0 - hom_ratio;
+
+            int num_states = tree->aln->getMaxNumStates();
+            int num_hom = 4;
+            int num_het = num_states - num_hom;
+
+            // Generate random frequencies for homozygous states (4 values)
+            double hom_sum = 0;
+            for (int i = 0; i < num_hom; i++) {
+                state_freqs[i] = random_double();
+                hom_sum += state_freqs[i];
+            }
+            // Normalize to sum to hom_ratio (0.90)
+            for (int i = 0; i < num_hom; i++)
+                state_freqs[i] = state_freqs[i] / hom_sum * hom_ratio;
+
+            // Generate random frequencies for heterozygous states (12 or 6 values)
+            double het_sum = 0;
+            for (int i = num_hom; i < num_states; i++) {
+                state_freqs[i] = random_double();
+                het_sum += state_freqs[i];
+            }
+            // Normalize to sum to het_ratio (0.05)
+            for (int i = num_hom; i < num_states; i++)
+                state_freqs[i] = state_freqs[i] / het_sum * het_ratio;
+        }
         // otherwise, randomly generate base frequencies based on uniform distribution
         else
             generateRandomBaseFrequencies(state_freqs);
         tree->getModel()->setStateFrequency(state_freqs);
-        
+
         // Minh's Q: why only decompose at this single one line?
-        // It should always be called 
+        // It should always be called
         tree->getModel()->decomposeRateMatrix();
     }
 }

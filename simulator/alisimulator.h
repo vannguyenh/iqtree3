@@ -237,7 +237,7 @@ protected:
         generate a random sequence by state frequencies
     */
     void generateRandomSequenceFromStateFreqs(int sequence_length, vector<short int> &sequence, double* state_freqs, int max_prob_pos);
-    
+
     /**
     *  export a sequence with gaps copied from the input sequence
     */
@@ -464,7 +464,6 @@ public:
     map<string, Node*> map_seqname_node; // mapping sequence name to Node (using when temporarily write sequences at tips to tmp_data file when simulating Indels)
     Insertion* latest_insertion = NULL;
     Insertion* first_insertion = NULL;
-    
     // variables to output sequences with multiple threads
     uint64_t starting_pos = 0;
     uint64_t output_line_length = 0;
