@@ -180,17 +180,20 @@ void ModelGenotype::init(const char *model_name, string model_params, StateFreqT
     std::string gt_model_name(plus + 1);
 
     ASSERT(num_states == std::stoi(gt_model_name.substr(2)));
+    this->freq_type = freq_type;
     // Initialise the parameters of genotype model
     dna_states = 4;
     // Initialise the base model
-    init_base_model(base_model_name.c_str(), model_params, freq_type, freq_params);
+    init_base_model(base_model_name.c_str(), model_params, FREQ_EQUAL, "");
     cout << "Initialised base genotype model of :" << gt_model_name  << endl;
     cout << "Base model name: " << base_model->getName() << endl;
-    // compute and install the genotype frequencies
-    init_genotype_frequencies(freq_params);
 
     // BQM: This line is missing, that's why decomposeRateMatrix is not called
+    // Initialize parent FIRST
     ModelMarkov::init(freq_type);
+
+    // THEN set genotype frequencies (this overwrites what parent set)
+    init_genotype_frequencies(freq_params);
 }
 
 void ModelGenotype::setCheckpoint(Checkpoint *checkpoint) {
@@ -324,4 +327,3 @@ void ModelGenotype::setBounds(double *lower_bound, double *upper_bound, bool *bo
         }
     }
 }
-

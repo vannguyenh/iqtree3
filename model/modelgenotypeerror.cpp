@@ -8,7 +8,7 @@
 #define MIN_DELTA 0
 #define MAX_DELTA 0.99
 
-// Bounds for sequencing error probability (epsilon)
+// Bounds for amplification/sequencing error probability (epsilon)
 #define MIN_EPSILON 0.0001
 #define MAX_EPSILON 0.5
 
