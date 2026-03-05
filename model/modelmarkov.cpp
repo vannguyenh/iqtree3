@@ -288,7 +288,8 @@ void ModelMarkov::getNameParamsFreq(ostream &retname) {
     if (fixed_parameters)
         return;
     if (freq_type == FREQ_EMPIRICAL || freq_type == FREQ_ESTIMATE ||
-        (freq_type == FREQ_USER_DEFINED && phylo_tree->aln->seq_type == SEQ_DNA)) {
+        (freq_type == FREQ_USER_DEFINED && (phylo_tree->aln->seq_type == SEQ_DNA ||
+                                            phylo_tree->aln->seq_type == SEQ_DOUBLET))) {
         retname << "{" << state_freq[0];
         for (int i = 1; i < num_states; i++)
             retname << "," << state_freq[i];
@@ -456,6 +457,15 @@ void ModelMarkov::report_state_freqs(ostream& out, double *custom_state_freq) {
                 out << "Warning! Some parameters hit the boundaries" << endl;
                 break;
             }
+        }
+    } else if (num_states == 16) {
+        // RNA 16-state doublet model: states encoded as b1*4+b2 (A=0,C=1,G=2,U=3)
+        static const char* bases = "ACGU";
+        out << setprecision(4);
+        out << "Doublet state frequencies:" << endl;
+        for (int i = 0; i < 16; i++) {
+            out << "  " << bases[i>>2] << bases[i&3] << ": " << f[i];
+            if (i % 4 == 3) out << endl;
         }
     }
 }
