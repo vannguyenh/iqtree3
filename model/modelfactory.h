@@ -62,6 +62,13 @@ string::size_type posPOMO(string &model_name);
 string::size_type posGENOTYPE(const string &model_name);
 
 /**
+    return the position of +RNA16, +RNA16A, +RNA16B in the model name
+    @param model_name model name string
+    @return position in the model string, string::npos if not found
+*/
+string::size_type posRNA(const string &model_name);
+
+/**
 Store the transition matrix corresponding to evolutionary time so that one must not compute again. 
 For efficiency purpose esp. for protein (20x20) or codon (61x61).
 The values of the map contain 3 matricies consecutively: transition matrix, 1st, and 2nd derivative
