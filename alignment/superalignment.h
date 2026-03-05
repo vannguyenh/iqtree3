@@ -73,6 +73,9 @@ public:
     /** read partition model file in NEXUS format into variable info */
     void readPartitionNexus(Params &params);
 
+    /** create stem/loop partitions from an RNA secondary structure dot-bracket file */
+    void readPartitionRNA(Params &params);
+
     /** read partition as files in a directory */
     void readPartitionDir(string partition_dir, char *sequence_type, InputType &intype, string model, bool remove_empty_seq);
 

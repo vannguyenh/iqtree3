@@ -19,6 +19,8 @@
  ***************************************************************************/
 
 #include <stdarg.h>
+#include <stack>
+#include <fstream>
 #include "superalignment.h"
 #include "nclextra/msetsblock.h"
 #include "nclextra/myreader.h"
@@ -79,6 +81,10 @@ SuperAlignment::SuperAlignment(Params &params) : Alignment()
 }
 
 void SuperAlignment::readFromParams(Params &params) {
+    if (params.rna_structure_file) {
+        readPartitionRNA(params);
+        return;
+    }
     if (isDirectory(params.partition_file)) {
         // reading all files in the directory
         readPartitionDir(params.partition_file, params.sequence_type, params.intype, params.model_name, params.remove_empty_seq);
@@ -627,6 +633,157 @@ void SuperAlignment::readPartitionNexus(Params &params) {
     if (input_aln)
         delete input_aln;
     delete sets_block;
+}
+
+// ---------------------------------------------------------------------------
+// readPartitionRNA — build stem/loop partitions from a dot-bracket structure
+// ---------------------------------------------------------------------------
+
+void SuperAlignment::readPartitionRNA(Params &params) {
+    // Read the source DNA/RNA alignment (A/C/G/U nucleotides)
+    if (!params.aln_file)
+        outError("--rna-structure requires an alignment file specified with -s");
+    Alignment *dna_aln = new Alignment((char*)params.aln_file,
+                                       (char*)"DNA", params.intype,
+                                       params.model_name);
+    int nsites = dna_aln->getNSite();
+
+    // Read the dot-bracket structure (one line, ignoring blank lines / comments)
+    ifstream ss_file(params.rna_structure_file);
+    if (!ss_file.is_open())
+        outError("Cannot open RNA structure file: " + string(params.rna_structure_file));
+    string structure;
+    while (getline(ss_file, structure)) {
+        // Skip blank lines and comment lines beginning with '#' or '>'
+        if (!structure.empty() && structure[0] != '#' && structure[0] != '>')
+            break;
+        structure.clear();
+    }
+    ss_file.close();
+    if (structure.empty())
+        outError("No dot-bracket structure found in file: " + string(params.rna_structure_file));
+
+    // Validate length — count all recognised structure characters
+    // Supported notations: '('/')' (standard dot-bracket),
+    //                      '<'/'>' (Rfam/Stockholm pseudoknot notation),
+    //                      '.' (unpaired/loop)
+    auto isOpen  = [](char c){ return c == '(' || c == '<'; };
+    auto isClose = [](char c){ return c == ')' || c == '>'; };
+    auto isLoop  = [](char c){ return c == '.';              };
+    auto isSS    = [&](char c){ return isOpen(c) || isClose(c) || isLoop(c); };
+
+    int dot_len = 0;
+    for (char c : structure)
+        if (isSS(c)) dot_len++;
+    if (dot_len != nsites)
+        outError("Structure length (" + to_string(dot_len) + ") does not match "
+                 "alignment length (" + to_string(nsites) + ")");
+
+    cout << "INFO: Parsing RNA secondary structure from " << params.rna_structure_file << endl;
+    cout << "INFO: Alignment has " << nsites << " sites; structure has "
+         << dot_len << " positions" << endl;
+
+    // Parse dot-bracket (stack-based) — build stem pairs and loop sites
+    vector<pair<int,int>> stem_pairs;
+    IntVector loop_sites;
+    stack<int> bracket_stack;
+
+    // We iterate the alignment positions (skipping non-SS chars)
+    int aln_pos = 0;
+    for (int i = 0; i < (int)structure.size(); i++) {
+        char c = structure[i];
+        if (isOpen(c)) {
+            bracket_stack.push(aln_pos++);
+        } else if (isClose(c)) {
+            if (bracket_stack.empty())
+                outError("Unmatched '" + string(1,c) + "' at structure position " + to_string(i + 1));
+            int left = bracket_stack.top();
+            bracket_stack.pop();
+            stem_pairs.push_back({left, aln_pos++});
+        } else if (isLoop(c)) {
+            loop_sites.push_back(aln_pos++);
+        }
+        // Ignore other characters (whitespace, etc.)
+    }
+    if (!bracket_stack.empty())
+        outError("Unmatched opening bracket in RNA structure file: " + string(params.rna_structure_file));
+
+    cout << "INFO: Found " << stem_pairs.size() << " stem pairs and "
+         << loop_sites.size() << " loop sites" << endl;
+
+    // Determine model names for the two partitions.
+    // The user's -m value goes to stems; loops default to GTR+F.
+    // Any rate-heterogeneity suffix (+G, +G4, +R4, +I, +I+G4, etc.) is
+    // extracted from the stem model and propagated to the loops partition so
+    // that both partitions share the same rate variation class.
+    string stem_model = params.model_name.empty() ? "RNA16A" : params.model_name;
+
+    // Extract rate-heterogeneity modifiers from the stem model string so they
+    // can be propagated to the loops partition.  Only recognised rate tokens
+    // are forwarded; model-name tokens (e.g. +GTR, +HKY) and frequency tokens
+    // (+F, +FO, +FQ, +F{...}) are silently ignored.
+    //
+    // Recognised rate tokens follow the pattern +<letter>[<digits or '{'>...]
+    // where the letter is one of:
+    //   G  -- discrete Gamma  (+G, +G4, +G{0.5})
+    //   I  -- invariable sites (+I, +I{0.2})
+    //   R  -- FreeRate         (+R, +R4, +R{...})
+    // but NOT multi-letter model names like +GTR, +HKY, +RNA16, etc.
+    // A token is a rate modifier iff: first char is G/I/R AND the second char
+    // (if present) is a digit, '{', or end-of-token.
+    string rate_suffix;
+    {
+        size_t plus_pos = stem_model.find('+');
+        if (plus_pos != string::npos) {
+            string mods = stem_model.substr(plus_pos); // e.g. "+G4", "+I+G4", "+F{...}+G4"
+            size_t i = 0;
+            while (i < mods.size()) {
+                if (mods[i] == '+') {
+                    size_t next = mods.find('+', i + 1);
+                    string token = mods.substr(i, (next == string::npos) ? string::npos : next - i);
+                    // token is e.g. "+G4", "+GTR", "+I{0.2}", "+R4", "+F{...}"
+                    // A rate token has exactly one letter after '+', followed by
+                    // digits, '{', or nothing.  Model names have 2+ letters.
+                    bool is_rate = false;
+                    if (token.size() >= 2) {
+                        char c1 = (char)toupper(token[1]);
+                        char c2 = (token.size() >= 3) ? token[2] : '\0';
+                        bool single_letter = (c2 == '\0' || c2 == '{' || isdigit((unsigned char)c2));
+                        is_rate = single_letter && (c1 == 'G' || c1 == 'I' || c1 == 'R');
+                    }
+                    if (is_rate)
+                        rate_suffix += token;
+                    i = (next == string::npos) ? mods.size() : next;
+                } else {
+                    i++;
+                }
+            }
+        }
+    }
+    // Loops partition: GTR+F plus any rate heterogeneity from the stem model
+    string loop_model = "GTR+F" + rate_suffix;
+
+    // --- Build stems partition (SEQ_DOUBLET, 16 states) ---
+    if (!stem_pairs.empty()) {
+        Alignment *stem_aln = new Alignment();
+        stem_aln->convertDNAToDoublet(dna_aln, stem_pairs);
+        stem_aln->name        = "stems";
+        stem_aln->model_name  = stem_model;
+        stem_aln->aln_file    = params.aln_file;
+        partitions.push_back(stem_aln);
+    }
+
+    // --- Build loops partition (SEQ_DNA, 4 states) ---
+    if (!loop_sites.empty()) {
+        Alignment *loop_aln = new Alignment();
+        loop_aln->extractSites(dna_aln, loop_sites);
+        loop_aln->name        = "loops";
+        loop_aln->model_name  = loop_model;
+        loop_aln->aln_file    = params.aln_file;
+        partitions.push_back(loop_aln);
+    }
+
+    delete dna_aln;
 }
 
 void SuperAlignment::readPartitionDir(string partition_dir, char *sequence_type,
