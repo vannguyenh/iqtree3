@@ -31,7 +31,8 @@ typedef uint32_t StateType;
 typedef vector<StateType> StateVector;
 
 enum SeqType {
-    SEQ_DNA, SEQ_PROTEIN, SEQ_BINARY, SEQ_MORPH, SEQ_MULTISTATE, SEQ_CODON, SEQ_POMO, SEQ_UNKNOWN, SEQ_GENOTYPE
+    SEQ_DNA, SEQ_PROTEIN, SEQ_BINARY, SEQ_MORPH, SEQ_MULTISTATE, SEQ_CODON, SEQ_POMO, SEQ_UNKNOWN, SEQ_GENOTYPE,
+    SEQ_DOUBLET  // RNA 16-state doublet model for paired (stem) sites
 };
 
 // IMPORTANT: refactor STATE_UNKNOWN

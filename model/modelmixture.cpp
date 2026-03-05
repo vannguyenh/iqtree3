@@ -19,6 +19,7 @@
 #include "modelpomomixture.h"
 #include "modelgenotype.h"
 #include "modelgenotypeerror.h"
+#include "modelrna.h"
 
 using namespace std;
 
@@ -1190,6 +1191,8 @@ ModelSubst* createModel(string model_str, ModelsBlock *models_block,
         else
             model = new ModelGenotypeError(model_str.c_str(), model_params, freq_type, freq_params, seqerr, tree);
             //outError("Sorry! We have not supported rate heterogeneity model for genotype type.");
+    } else if (tree->aln->seq_type == SEQ_DOUBLET) {
+        model = new ModelRNA(model_str.c_str(), model_params, freq_type, freq_params, tree);
     } else {
 		outError("Unsupported model type");
 	}
