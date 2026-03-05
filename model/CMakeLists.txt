@@ -5,6 +5,7 @@ modeldna.cpp modeldna.h
 modeldnaerror.cpp modeldnaerror.h
 modelgenotype.cpp modelgenotype.h
 modelgenotypeerror.cpp modelgenotypeerror.h
+modelrna.cpp modelrna.h
 modelfactory.cpp modelfactory.h
 modelprotein.cpp modelprotein.h
 modelset.cpp modelset.h

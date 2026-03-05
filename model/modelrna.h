@@ -2,9 +2,9 @@
  *   Copyright (C) 2024                                                    *
  *                                                                         *
  *   RNA secondary structure doublet substitution models.                  *
- *   Implements the S16, S16A, S16B family from:                           *
+ *   Implements the RNA16, RNA16A, RNA16B family from:                     *
  *     Savill, Hoyle & Higgs (2001) Genetics 157:399-411                   *
- *   and as implemented in RAxML (Stamatakis 2014).                        *
+ *   and as implemented in RAxML (Stamatakis 2014) as S16/S16A/S16B.      *
  *                                                                         *
  *   State encoding (0-15):                                                *
  *     0=AA 1=AC 2=AG 3=AU                                                 *
@@ -13,14 +13,14 @@
  *     12=UA 13=UC 14=UG 15=UU                                             *
  *                                                                         *
  *   Parameter counts (free params) — verified against RAxML source:      *
- *     S16  (= PHASE 16A): full 16-state GTR                               *
+ *     RNA16  (= PHASE 16A, RAxML S16):  full 16-state GTR                 *
  *                          119 free exchangeabilities + 15 free freqs     *
  *                          = 134 total                                    *
- *     S16A (= PHASE 16B): 5 rate classes, 1 is the reference (=1.0)      *
+ *     RNA16A (= PHASE 16B, RAxML S16A): 5 rate classes, 1 is reference   *
  *                          => 4 free rate params + 15 free freqs = 19     *
- *     S16B (= PHASE 16C): 1 rate class (= reference = 1.0), 0 free rates *
+ *     RNA16B (= PHASE 16C, RAxML S16B): 1 rate class (= reference = 1.0) *
  *                          => 0 free rate params + 15 free freqs = 15     *
- *   Both S16A and S16B also have 61 forbidden (zero-rate) transitions     *
+ *   Both RNA16A and RNA16B have 61 forbidden (zero-rate) transitions      *
  *   (the same set for both models) corresponding to double substitutions  *
  *   and biologically disallowed pairs.                                    *
  *                                                                         *
@@ -36,7 +36,7 @@
 #include "modeldna.h"
 
 /**
- * RNA 16-state doublet substitution model family (S16, S16A, S16B).
+ * RNA 16-state doublet substitution model family (RNA16, RNA16A, RNA16B).
  *
  * Derives from ModelDNA to reuse its param_spec / param_fixed /
  * setRateType() machinery for constrained-rate models.
@@ -44,21 +44,21 @@
  * Three variants are supported, matching RAxML's SEC_16 / SEC_16_A /
  * SEC_16_B (verified from RAxML models.c setupSecondaryStructureSymmetries):
  *
- *   S16  (SEC_16,  RAxML S16):
+ *   RNA16  (= PHASE 16A, RAxML S16):
  *     Full 16-state GTR — 119 free exchangeabilities + 15 free freqs = 134.
  *     All 120 upper-triangle rates are independent (no param_spec needed;
  *     num_params = 119 set by ModelMarkov::setReversible).
  *
- *   S16A (SEC_16_A, RAxML S16A):
+ *   RNA16A (= PHASE 16B, RAxML S16A):
  *     5 rate classes across the 59 allowed (non-zero) transitions; the class
  *     corresponding to symmetryVector value 3 is taken as the reference
  *     (fixed = 1.0), leaving 4 free rate params.  61 transitions forbidden
  *     (rate = 0.0).  15 free frequencies.  Total: 19 free params.
  *
- *   S16B (SEC_16_B, RAxML S16B):
+ *   RNA16B (= PHASE 16C, RAxML S16B):
  *     All 59 allowed transitions share a single rate class (= reference,
  *     fixed = 1.0) — zero free rate params.  Same 61 forbidden transitions
- *     as S16A.  15 free frequencies.  Total: 15 free params.
+ *     as RNA16A.  15 free frequencies.  Total: 15 free params.
  */
 class ModelRNA : public ModelDNA {
 public:
@@ -66,14 +66,14 @@ public:
      * RNA model variant identifiers.
      */
     enum RNAModelVariant {
-        RNA_S16,   // Full 16-state GTR: 119 free rates + 15 free freqs = 134
-        RNA_S16A,  // Constrained:         4 free rates + 15 free freqs = 19
-        RNA_S16B   // Equal-rates:         0 free rates + 15 free freqs = 15
+        RNA16,    // Full 16-state GTR: 119 free rates + 15 free freqs = 134
+        RNA16A,   // Constrained:         4 free rates + 15 free freqs = 19
+        RNA16B    // Equal-rates:         0 free rates + 15 free freqs = 15
     };
 
     /**
      * Constructor.
-     * @param model_name   "S16", "S16A", or "S16B"
+     * @param model_name   "RNA16", "RNA16A", or "RNA16B"
      * @param model_params optional rate parameters (empty = defaults)
      * @param freq_type    state frequency type
      * @param freq_params  optional frequency parameters
@@ -99,7 +99,7 @@ public:
     virtual void init(const char *model_name, string model_params,
                       StateFreqType freq_type, string freq_params);
 
-    /** @return model name string ("S16", "S16A", or "S16B"). */
+    /** @return model name string ("RNA16", "RNA16A", or "RNA16B"). */
     virtual string getName();
 
     /** @return model name with current parameter values. */
@@ -116,9 +116,20 @@ public:
     virtual void saveCheckpoint();
     virtual void restoreCheckpoint();
 
+    /**
+     * RNA16 (full GTR) overrides: pack/unpack only the 58 free allowed rates,
+     * keeping forbidden rates at 0.  Delegates to ModelDNA for RNA16A/B.
+     */
+    virtual void setVariables(double *variables);
+    virtual bool getVariables(double *variables);
+
 private:
     RNAModelVariant variant;
-    string rna_model_name;  // "S16", "S16A", or "S16B"
+    string rna_model_name;  // "RNA16", "RNA16A", or "RNA16B"
+
+    // For RNA16 (full GTR): maps optimizer slot i (1-based) to rates[] index.
+    // Length = num_params.  Forbidden rates are skipped in this mapping.
+    vector<int> rna16_free_indices;
 
     /**
      * Initialise equilibrium frequencies from freq_params or alignment.
@@ -126,10 +137,10 @@ private:
     void initDoubletFrequencies(string freq_params);
 
     /**
-     * Apply the S16A/S16B symmetry vector to param_spec:
+     * Apply the RNA16A/RNA16B symmetry vector to param_spec:
      * - Sets forbidden (rate=0) entries explicitly to 0 in rates[].
      * - Calls setRateType() with the 120-char spec string for constrained
-     *   models; for S16 leaves ModelMarkov's default (full GTR) in place.
+     *   models; for RNA16 leaves ModelMarkov's default (full GTR) in place.
      */
     void applySymmetryVector();
 
@@ -143,7 +154,7 @@ private:
 };
 
 /**
- * Return the position of "+RNA16", "+S16", "+S16A", "+S16B" in the model
+ * Return the position of "+RNA16", "+RNA16A", "+RNA16B" in the model
  * name string, or string::npos if not found.
  */
 string::size_type posRNA(const string &model_name);
