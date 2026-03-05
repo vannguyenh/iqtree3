@@ -5224,6 +5224,12 @@ void runPhyloAnalysis(Params &params, Checkpoint *checkpoint, IQTree *&tree, Ali
     checkpoint->setDumpInterval(params.checkpoint_dump_interval);
 
     /****************** read in alignment **********************/
+    if (params.rna_structure_file) {
+        if (params.partition_file)
+            outError("Cannot use --rna-structure together with --partition/-p/-q");
+        // Route through SuperAlignment; readFromParams will call readPartitionRNA()
+        params.partition_file = params.rna_structure_file;
+    }
     if (params.partition_file) {
         // Partition model analysis
         if (!align_is_given)

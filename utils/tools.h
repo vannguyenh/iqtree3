@@ -1004,6 +1004,11 @@ public:
     char *partition_file;
 
     /**
+            dot-bracket RNA secondary structure file for --rna-structure
+     */
+    char *rna_structure_file;
+
+    /**
      *      IMPORTANT (2012-12-21): refactor this variable as below
      * 		defines the relation between edge lengths in supertree and subtrees
      * 		BRLEN_OPTIMIZE (0) for separate edge length (default)
