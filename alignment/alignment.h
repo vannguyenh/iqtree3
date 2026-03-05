@@ -661,6 +661,14 @@ public:
         convert a DNA alignment into codon or AA alignment
     */
     void convertToCodonOrAA(Alignment *aln, char *gene_code_id, bool nt2aa = false);
+
+    /**
+        convert a DNA alignment into a 16-state RNA doublet alignment
+        given a set of paired column indices (stem pairs from secondary structure)
+        @param aln    source DNA alignment (must have seq_type == SEQ_DNA)
+        @param pairs  vector of (left_col, right_col) stem pair indices
+    */
+    void convertDNAToDoublet(Alignment *aln, vector<pair<int,int>> &pairs);
     
     /**
         get Codon StateType from input sites
