@@ -1620,6 +1620,7 @@ void parseArg(int argc, char *argv[], Params &params) {
 				if (cnt >= argc)
 					throw "Use -seed <random_seed>";
 				params.ran_seed = abs(convert_int(argv[cnt]));
+                params.seed_specified = true;
 				continue;
 			}
 			if (strcmp(argv[cnt], "-pdgain") == 0) {
@@ -2460,6 +2461,16 @@ void parseArg(int argc, char *argv[], Params &params) {
                     throw "<SCALE> must be positive!";
                 continue;
             }
+            if (strcmp(argv[cnt], "-pop-size") == 0 || strcmp(argv[cnt], "--pop-size") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -pop-size <NUM>";
+                const double pop_size = convert_double(argv[cnt]);
+                if (pop_size <= 0)
+                    throw "Population size must be positive!";
+                params.alisim_branch_scale = 0.5 / pop_size;
+                continue;
+            }
             if (strcmp(argv[cnt], "--site-rate") == 0) {
                 cnt++;
                 if (cnt >= argc)
@@ -2588,6 +2599,10 @@ void parseArg(int argc, char *argv[], Params &params) {
                 if (cnt >= argc)
                     throw "Use --branch-distribution <distribution_name> to specify a distribution, from which branch lengths will be randomly generated.";
                 params.branch_distribution = argv[cnt];
+                continue;
+            }
+            if (strcmp(argv[cnt], "--skip-bl-check") == 0) {
+                params.alisim_skip_bl_check = true;
                 continue;
             }
             if (strcmp(argv[cnt], "--simulation-thresh") == 0) {
@@ -4551,6 +4566,11 @@ void parseArg(int argc, char *argv[], Params &params) {
                 continue;
             }
 
+            if (strcmp(argv[cnt], "--weighted-perturbation") == 0 || strcmp(argv[cnt], "-weighted-perturbation") == 0) {
+                params.weightedPerturbation = true;
+                continue;
+            }
+
 //			if (strcmp(argv[cnt], "-rootstate") == 0) {
 //                cnt++;
 //                if (cnt >= argc)
@@ -4959,6 +4979,11 @@ void parseArg(int argc, char *argv[], Params &params) {
 				params.force_unfinished = true;
 				continue;
 			}
+      
+      if (strcmp(argv[cnt], "-force-aa-mix-finder") == 0 || strcmp(argv[cnt], "--force-aa-mix-finder") == 0) {
+        params.force_aa_mix_finder = true;
+        continue;
+      }
 
 			if (strcmp(argv[cnt], "-cptime") == 0 || strcmp(argv[cnt], "--cptime") == 0) {
 				cnt++;
@@ -5395,7 +5420,10 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.make_consistent = true;
                 continue;
             }
-
+            if (strcmp(argv[cnt], "-mrbayes") == 0) {
+                params.mr_bayes_output = true;
+                continue;
+            }
             if (argv[cnt][0] == '-') {
                 string err = "Invalid \"";
                 err += argv[cnt];
@@ -5536,6 +5564,10 @@ void parseArg(int argc, char *argv[], Params &params) {
     if (params.model_name.find("LINK") != string::npos || params.model_name.find("MERGE") != string::npos)
         if (params.partition_merge == MERGE_NONE)
             params.partition_merge = MERGE_RCLUSTERF;
+
+    // Set MrBayes Block Output if -mset mrbayes
+    if (params.model_set == "mrbayes")
+        params.mr_bayes_output = true;
     
     if (params.alisim_active && !params.aln_file && !params.user_file && !params.partition_file && params.tree_gen == NONE)
         outError("A tree filepath is a mandatory input to execute AliSim when neither Inference mode nor Random mode (generating a random tree) is inactive. Use -t <TREE_FILEPATH> ; or Activate the inference mode by -s <ALIGNMENT_FILE> ; or Activate Random mode by -t RANDOM{<MODEL>,<NUM_TAXA>} where <MODEL> is yh, u, cat, bal, bd{<birth_rate>,<death_rate>} stands for Yule-Harding, Uniform, Caterpillar, Balanced, Birth-Death model respectively.");
@@ -5543,6 +5575,18 @@ void parseArg(int argc, char *argv[], Params &params) {
     // computeTransMatix has not yet implemented for ModelSet
     if (params.alisim_active && (params.tree_freq_file || params.site_freq_file))
         outError("Sorry! `-ft` (--site-freq) and `-fs` (--tree-freq) options are not fully supported in AliSim. However, AliSim can estimate posterior mean frequencies from the alignment. Please try again without `-ft` and `-fs` options!");
+    
+    // Users have to specify a random seed to run AliSim
+    if (params.alisim_active && !params.seed_specified)
+        outError("To make the simulation reproducible, please specify a random seed via `-seed <NUM>`");
+    
+    // Don't allow using both --branch-scale and -pop-size at the same time
+    if (params.alisim_active)
+    {
+        if (params.original_params.find("-branch-scale") != std::string::npos &&
+            params.original_params.find("-pop-size") != std::string::npos)
+            outError("Only one of `--branch-scale` or `-pop-size` can be specified at a time.");
+    }
     
     // set default filename for the random tree if AliSim is running in Random mode
     if (params.alisim_active && !params.user_file && params.tree_gen != NONE)
@@ -5749,7 +5793,7 @@ void usage_iqtree(char* argv[], bool full_command) {
 //            << "  -pll                 Use phylogenetic likelihood library (PLL) (default: off)" << endl
     << "  --ninit NUM          Number of initial parsimony trees (default: 100)" << endl
     << "  --ntop NUM           Number of top initial trees (default: 20)" << endl
-    << "  --nbest NUM          Number of best trees retained during search (defaut: 5)" << endl
+    << "  --nbest NUM          Number of best trees retained during search (default: 5)" << endl
     << "  -n NUM               Fix number of iterations to stop (default: OFF)" << endl
     << "  --nstop NUM          Number of unsuccessful iterations to stop (default: 100)" << endl
     << "  --perturb NUM        Perturbation strength for randomized NNI (default: 0.5)" << endl
@@ -5809,6 +5853,8 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "  -m ...+LMSS          Additionally test strand-symmetric models" << endl
     << "  --mset STRING        Restrict search to models supported by other programs" << endl
     << "                       (raxml, phyml, mrbayes, beast1 or beast2)" << endl
+    << "                       If 'mrbayes' is selected, will output a MrBayes" << endl
+    << "                       Block File if Data Type is supported." << endl
     << "  --mset STR,...       Comma-separated model list (e.g. -mset WAG,LG,JTT)" << endl
     << "  --msub STRING        Amino-acid model source" << endl
     << "                       (nuclear, mitochondrial, chloroplast or viral)" << endl
@@ -6048,8 +6094,7 @@ void usage_iqtree(char* argv[], bool full_command) {
     //			<< "  -d <outfile>         Calculate the distance matrix inferred from tree" << endl
     //			<< "  -stats <outfile>     Output some statistics about branch lengths" << endl
     //			<< "  -comp <treefile>     Compare tree with each in the input trees" << endl;
-
-
+        << "  -mrbayes             Outputs a Mr Bayes block file, to use as a template for future analysis" << endl
         << endl;
 
     if (full_command) {
@@ -7258,6 +7303,7 @@ void Params::setDefault() {
     new_heuristic = true;
     iteration_multiple = 1;
     initPS = 0.5;
+    weightedPerturbation = false;
 #ifdef USING_PLL
     pll = true;
 #else
@@ -7339,6 +7385,7 @@ void Params::setDefault() {
     ignore_checkpoint = false;
     checkpoint_dump_interval = 60;
     force_unfinished = false;
+    force_aa_mix_finder = false; // merged from 375ab15
     print_all_checkpoints = false;
     suppress_output_flags = 0;
     ufboot2corr = false;
@@ -7402,6 +7449,7 @@ void Params::setDefault() {
     ran_seed = (tv.tv_usec);
     subsampling_seed = ran_seed;
     subsampling = 0;
+    seed_specified = false;
     
     suppress_list_of_sequences = false;
     suppress_zero_distance_warnings = false;
@@ -7430,6 +7478,7 @@ void Params::setDefault() {
     alisim_skip_checking_memory = false;
     alisim_write_internal_sequences = false;
     alisim_only_unroot_tree = false;
+    alisim_skip_bl_check = false;
     branch_distribution = nullptr;
     alisim_insertion_ratio = 0;
     alisim_deletion_ratio = 0;
@@ -7463,6 +7512,7 @@ void Params::setDefault() {
     include_pre_mutations = false;
     mutation_file = "";
     site_starting_index = 0;
+    mr_bayes_output = false; //merged from 19b1fdc
     
     // ----------- SPRTA ----------
     compute_SPRTA = false;
@@ -8243,4 +8293,40 @@ string getOutputNameWithExt(const InputType& format, const string& output_filepa
         default:
             return output_filepath + ".phy";
     }
+}
+
+double minValueCheckMrBayes(double orig_value) {
+     if (orig_value < 0.01) {
+         outWarning("MrBayes does not support values < 0.01! Using 0.01 instead...");
+         return 0.01;
+     }
+     return orig_value;
+}
+
+const unordered_map<string, string> iqtree_to_mr_bayes_aa_models = {
+        {"Poisson", "poisson"},
+        {"JTT", "jones"},
+        {"Dayhoff", "dayhoff"},
+        {"mtREV", "mtrev"},
+        {"mtMAM", "mtmam"},
+        {"WAG", "wag"},
+        {"rtREV", "rtrev"},
+        {"cpREV", "cprev"},
+        {"VT", "vt"},
+        {"Blosum62", "blosum"},
+        {"LG", "lg"},
+};
+
+// Anything outside of index 10 (Code No. 11) is invalid, leave that as empty string
+const string indexed_mr_bayes_genetic_codes[25] = {"universal", "vertmt", "yeast", "mycoplasma", "invermt",
+                                               "ciliate", "", "", "echinoderm", "euplotid", "universal"};
+
+unordered_map<string, string> getIqTreeToMrBayesAAModels() {
+    return iqtree_to_mr_bayes_aa_models;
+}
+
+string getMrBayesGeneticCode(int geneticCodeId) {
+    if (geneticCodeId == 0) return "";
+
+    return indexed_mr_bayes_genetic_codes[geneticCodeId - 1];
 }
