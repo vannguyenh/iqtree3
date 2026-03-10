@@ -1560,6 +1560,7 @@ void reportPhyloAnalysis(Params &params, IQTree &tree, ModelCheckpoint &model_in
                 case SEQ_PROTEIN: out << "AA"; break;
                 case SEQ_POMO: out << "POMO"; break;
                 case SEQ_GENOTYPE: out << "GT"; break;
+                case SEQ_DOUBLET: out << "RNA"; break;
                 case SEQ_UNKNOWN: out << "???"; break;
                 }
                 out << "\t" << (*it)->aln->getNSeq() << "\t" << (*it)->aln->getNSite()
@@ -5227,10 +5228,11 @@ void runPhyloAnalysis(Params &params, Checkpoint *checkpoint, IQTree *&tree, Ali
     if (params.rna_structure_file) {
         if (params.partition_file)
             outError("Cannot use --rna-structure together with --partition/-p/-q");
-        // Route through SuperAlignment; readFromParams will call readPartitionRNA()
-        params.partition_file = params.rna_structure_file;
-    }
-    if (params.partition_file) {
+        // Build stem+loop partitions directly; do NOT set params.partition_file
+        // (that would trigger NEXUS-partition logic elsewhere in the code).
+        if (!align_is_given)
+            alignment = new SuperAlignment(params);
+    } else if (params.partition_file) {
         // Partition model analysis
         if (!align_is_given)
             if (params.partition_type == TOPO_UNLINKED)
