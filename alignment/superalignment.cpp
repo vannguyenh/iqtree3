@@ -667,37 +667,48 @@ void SuperAlignment::readPartitionRNA(Params &params) {
     if (structure.empty())
         outError("No dot-bracket structure found in file: " + string(params.rna_structure_file));
 
-    // Full WUSS (Washington University Secondary Structure) notation.
-    // Every character in the SS_cons string maps to exactly one alignment column.
+    // WUSS (Washington University Secondary Structure) notation.
+    // Every non-whitespace character in the SS_cons string maps to exactly one
+    // alignment column.
     //
-    // Stem characters (paired) — each type uses its own independent stack:
-    //   '(' ')' — stem level 1
-    //   '<' '>' — stem level 2
-    //   '{' '}' — stem level 3
-    //   '[' ']' — stem level 4
-    //   'A' 'a' — pseudoknot stem, level A (uppercase open, lowercase close)
-    //   'B' 'b' — pseudoknot stem, level B
-    //   'C' 'c' — pseudoknot stem, level C
-    //   'D' 'd' — pseudoknot stem, level D
+    // Stem characters treated as PAIRED (go to doublet/RNA partition):
+    //   '<' '>'  — stem level 1 (Rfam primary stem notation)
+    //   '(' ')'  — stem level 2
+    //   '{' '}'  — stem level 3
+    //   '[' ']'  — stem level 4
+    // All four are Watson-Crick nesting levels and are treated as stem pairs,
+    // consistent with RAxML (-S) and the original PHASE S16 model.
     //
-    // Loop/unpaired characters (count toward alignment, go to loop partition):
+    // Pseudoknot characters treated as UNPAIRED (go to loop/GTR partition),
+    // matching RAxML and PHASE which do not apply doublet substitution to
+    // topologically crossing (pseudoknot) base pairs:
+    //   'A' 'a'  — pseudoknot level A
+    //   'B' 'b'  — pseudoknot level B
+    //   'C' 'c'  — pseudoknot level C
+    //   'D' 'd'  — pseudoknot level D
+    //
+    // Loop/unpaired characters:
     //   '.'  — unpaired
     //   '_'  — unpaired hairpin loop
     //   ','  — unpaired multifurcation loop
-    //   '-'  — insertion column relative to consensus (variable-presence column)
-    //   ':'  — single-stranded flanking region
+    //   '-'  — insertion column relative to consensus
+    //   ':'  — single—stranded flanking region
     //
     // Whitespace is ignored (does not map to an alignment column).
     auto isOpen  = [](char c) {
-        return c == '(' || c == '<' || c == '{' || c == '[' ||
-               c == 'A' || c == 'B' || c == 'C' || c == 'D';
+        return c == '<' || c == '(' || c == '{' || c == '[';
     };
     auto isClose = [](char c) {
-        return c == ')' || c == '>' || c == '}' || c == ']' ||
-               c == 'a' || c == 'b' || c == 'c' || c == 'd';
+        return c == '>' || c == ')' || c == '}' || c == ']';
     };
     auto isLoop  = [](char c) {
-        return c == '.' || c == '_' || c == ',' || c == '-' || c == ':';
+        if (c == '.' || c == '_' || c == ',' || c == '-' || c == ':')
+            return true;
+        // Pseudoknot levels treated as unpaired
+        if (c == 'A' || c == 'a' || c == 'B' || c == 'b' ||
+            c == 'C' || c == 'c' || c == 'D' || c == 'd')
+            return true;
+        return false;
     };
     auto isSS    = [&](char c){ return isOpen(c) || isClose(c) || isLoop(c); };
 
@@ -713,29 +724,21 @@ void SuperAlignment::readPartitionRNA(Params &params) {
          << dot_len << " positions" << endl;
 
     // Parse WUSS notation (stack-based) — build stem pairs and loop sites.
-    // Each bracket/letter type has its own independent stack so that different
-    // pseudoknot levels do not interfere with each other.
+    // Each bracket type has its own independent stack so nesting levels do not
+    // interfere with each other.  Pseudoknot letter pairs (Aa-Dd) are already
+    // handled by isLoop() above and never reach the stack logic.
     vector<pair<int,int>> stem_pairs;
     IntVector loop_sites;
-    stack<int> stack_round;   // '(' ')'
     stack<int> stack_angle;   // '<' '>'
+    stack<int> stack_round;   // '(' ')'
     stack<int> stack_curly;   // '{' '}'
     stack<int> stack_square;  // '[' ']'
-    stack<int> stack_A;       // 'A' 'a'
-    stack<int> stack_B;       // 'B' 'b'
-    stack<int> stack_C;       // 'C' 'c'
-    stack<int> stack_D;       // 'D' 'd'
 
-    // Helper: return the correct stack for a given WUSS character.
     auto stackFor = [&](char c) -> stack<int>* {
-        if (c == '(' || c == ')') return &stack_round;
         if (c == '<' || c == '>') return &stack_angle;
+        if (c == '(' || c == ')') return &stack_round;
         if (c == '{' || c == '}') return &stack_curly;
-        if (c == '[' || c == ']') return &stack_square;
-        if (c == 'A' || c == 'a') return &stack_A;
-        if (c == 'B' || c == 'b') return &stack_B;
-        if (c == 'C' || c == 'c') return &stack_C;
-        /* 'D' or 'd' */           return &stack_D;
+        /* '[' or ']' */           return &stack_square;
     };
 
     int aln_pos = 0;
@@ -755,10 +758,8 @@ void SuperAlignment::readPartitionRNA(Params &params) {
         }
         // Whitespace: ignore (does not map to an alignment column)
     }
-    if (!stack_round.empty() || !stack_angle.empty() ||
-        !stack_curly.empty() || !stack_square.empty() ||
-        !stack_A.empty()     || !stack_B.empty()      ||
-        !stack_C.empty()     || !stack_D.empty())
+    if (!stack_angle.empty() || !stack_round.empty() ||
+        !stack_curly.empty() || !stack_square.empty())
         outError("Unmatched opening bracket in RNA structure file: " + string(params.rna_structure_file));
 
     cout << "INFO: Found " << stem_pairs.size() << " stem pairs and "
