@@ -5227,7 +5227,8 @@ void runPhyloAnalysis(Params &params, Checkpoint *checkpoint, IQTree *&tree, Ali
     /****************** read in alignment **********************/
     if (params.rna_structure_file) {
         if (params.partition_file)
-            outError("Cannot use --rna-structure together with --partition/-p/-q");
+            outError("Cannot use --rna-structure together with -p/-q/-Q/-S "
+                     "(use --edge {equal|scale|unlink} to control branch length linkage instead)");
         // Build stem+loop partitions directly; do NOT set params.partition_file
         // (that would trigger NEXUS-partition logic elsewhere in the code).
         if (!align_is_given)
