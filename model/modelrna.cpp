@@ -411,6 +411,27 @@ void ModelRNA::initDoubletFrequencies(string freq_params) {
             phylo_tree->aln->computeStateFreq(state_freq);
             break;
     }
+    // Clamp any near-zero doublet frequencies and renormalize.
+    // The EM in computeStateFreq (convertCountToFreq) drives absent states to
+    // essentially 0.0; convfreq() is skipped by default (keep_zero_freq=true).
+    // Near-zero frequencies cause numerical instability in eigendecomposition.
+    {
+        // Use 0.001 as the floor for doublet states (matches RAxML behaviour).
+        // This is intentionally larger than the global min_state_freq (0.0001).
+        double min_freq = 0.001;
+        double sum = 0.0;
+        bool clamped = false;
+        for (int i = 0; i < num_states; i++) {
+            if (state_freq[i] < min_freq) {
+                state_freq[i] = min_freq;
+                clamped = true;
+            }
+        }
+        if (clamped) {
+            for (int i = 0; i < num_states; i++) sum += state_freq[i];
+            for (int i = 0; i < num_states; i++) state_freq[i] /= sum;
+        }
+    }
     ModelMarkov::setStateFrequency(state_freq);
 }
 
