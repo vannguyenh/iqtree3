@@ -194,8 +194,12 @@ double PartitionModelPlen::optimizeParameters(int fixed_len, bool write_info, do
 }
 
 double PartitionModelPlen::optimizeParametersGammaInvar(int fixed_len, bool write_info, double logl_epsilon, double gradient_epsilon) {
-    outError("Thorough I+G parameter optimization does not work with edge-linked partition model yet");
-    return 0.0;
+    // Delegate to optimizeParameters with the gamma-invar flag set,
+    // the same way PartitionModel does it for the edge-unlinked case.
+    opt_gamma_invar = true;
+    double tree_lh = optimizeParameters(fixed_len, write_info, logl_epsilon, gradient_epsilon);
+    opt_gamma_invar = false;
+    return tree_lh;
 }
 
 void PartitionModelPlen::writeInfo(ostream &out) {
