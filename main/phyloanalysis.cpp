@@ -1966,9 +1966,12 @@ void reportPhyloAnalysis(Params &params, IQTree &tree, ModelCheckpoint &model_in
 					out << " - ";
 
                 if (params.do_au_test) {
+                    double deltaL = maxL - info[tid].logl;
+                    double au_pvalue = (params.au_epsilon > 0.0 && deltaL < params.au_epsilon)
+                                      ? 1.0 : info[tid].au_pvalue;
                     out.width(8);
-                    out << right << info[tid].au_pvalue;
-                    if (info[tid].au_pvalue < 0.05)
+                    out << right << au_pvalue;
+                    if (au_pvalue < 0.05)
                         out << " - ";
                     else
                         out << " + ";
