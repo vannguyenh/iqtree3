@@ -766,38 +766,49 @@ void SuperAlignment::readPartitionRNA(Params &params) {
          << loop_sites.size() << " loop sites" << endl;
 
     // Determine model names for the two partitions.
-    // The user's -m value goes to stems; loops default to GTR+F.
-    // Any rate-heterogeneity suffix (+G, +G4, +R4, +I, +I+G4, etc.) is
-    // extracted from the stem model and propagated to the loops partition so
-    // that both partitions share the same rate variation class.
-    string stem_model = params.model_name.empty() ? "RNA16A" : params.model_name;
-
-    // Extract rate-heterogeneity modifiers from the stem model string so they
-    // can be propagated to the loops partition.  Only recognised rate tokens
-    // are forwarded; model-name tokens (e.g. +GTR, +HKY) and frequency tokens
-    // (+F, +FO, +FQ, +F{...}) are silently ignored.
     //
-    // Recognised rate tokens follow the pattern +<letter>[<digits or '{'>...]
-    // where the letter is one of:
-    //   G  -- discrete Gamma  (+G, +G4, +G{0.5})
-    //   I  -- invariable sites (+I, +I{0.2})
-    //   R  -- FreeRate         (+R, +R4, +R{...})
-    // but NOT multi-letter model names like +GTR, +HKY, +RNA16, etc.
-    // A token is a rate modifier iff: first char is G/I/R AND the second char
-    // (if present) is a digit, '{', or end-of-token.
+    // Syntax: -m <loop_model>/<stem_model>
+    //   e.g.  -m JC/RNA16+G       (JC for loops, RNA16+G for stems; +G propagated)
+    //         -m JC+I/RNA16+G     (JC+I for loops, RNA16+G for stems; no propagation)
+    //         -m RNA16+G          (no slash: loops default to GTR+F+G)
+    //
+    // Partition order: loops first (ID 1 = DNA), stems second (ID 2 = RNA).
+    // This matches RAxML: partition [0] = DNA loops, partition [1] = RNA stems.
+    //
+    // Rate-heterogeneity propagation: +G/+I/+R tokens from the stem model are
+    // appended to the loop model only when the loop side has no rate token yet.
+
+    string full_model = params.model_name.empty() ? "RNA16A" : params.model_name;
+    string stem_model, loop_model;
+
+    // --- Step 1: split on '/' ---
+    size_t slash_pos = full_model.find('/');
+    bool user_loop_model = (slash_pos != string::npos);
+    if (user_loop_model) {
+        loop_model = full_model.substr(0, slash_pos);   // left  of '/' = loops (DNA)
+        stem_model = full_model.substr(slash_pos + 1);  // right of '/' = stems (RNA)
+        if (stem_model.empty())
+            outError("--rna-structure: stem model missing after '/' in -m " + full_model);
+        if (loop_model.empty())
+            outError("--rna-structure: loop model missing before '/' in -m " + full_model);
+    } else {
+        stem_model = full_model;
+        loop_model = "";   // filled in below
+    }
+
+    // --- Step 2: extract rate tokens from the stem model ---
+    // Only +G/+I/+R tokens are collected (single letter followed by digit/'{'/end).
+    // Multi-letter model names (+GTR, +HKY, +RNA16) and frequency tokens are ignored.
     string rate_suffix;
     {
         size_t plus_pos = stem_model.find('+');
         if (plus_pos != string::npos) {
-            string mods = stem_model.substr(plus_pos); // e.g. "+G4", "+I+G4", "+F{...}+G4"
+            string mods = stem_model.substr(plus_pos);
             size_t i = 0;
             while (i < mods.size()) {
                 if (mods[i] == '+') {
                     size_t next = mods.find('+', i + 1);
                     string token = mods.substr(i, (next == string::npos) ? string::npos : next - i);
-                    // token is e.g. "+G4", "+GTR", "+I{0.2}", "+R4", "+F{...}"
-                    // A rate token has exactly one letter after '+', followed by
-                    // digits, '{', or nothing.  Model names have 2+ letters.
                     bool is_rate = false;
                     if (token.size() >= 2) {
                         char c1 = (char)toupper(token[1]);
@@ -814,20 +825,39 @@ void SuperAlignment::readPartitionRNA(Params &params) {
             }
         }
     }
-    // Loops partition: GTR+F plus any rate heterogeneity from the stem model
-    string loop_model = "GTR+F" + rate_suffix;
 
-    // --- Build stems partition (SEQ_DOUBLET, 16 states) ---
-    if (!stem_pairs.empty()) {
-        Alignment *stem_aln = new Alignment();
-        stem_aln->convertDNAToDoublet(dna_aln, stem_pairs);
-        stem_aln->name        = "stems";
-        stem_aln->model_name  = stem_model;
-        stem_aln->aln_file    = params.aln_file;
-        partitions.push_back(stem_aln);
+    // --- Step 3: build the final loop model string ---
+    if (!user_loop_model) {
+        // No slash: default loop model is GTR+F with the stem rate suffix
+        loop_model = "GTR+F" + rate_suffix;
+    } else if (!rate_suffix.empty()) {
+        // Slash given: propagate rate suffix only if loop side has no rate token yet
+        bool loop_has_rate = false;
+        {
+            size_t p = loop_model.find('+');
+            while (p != string::npos) {
+                size_t next = loop_model.find('+', p + 1);
+                string tok = loop_model.substr(p, (next == string::npos) ? string::npos : next - p);
+                if (tok.size() >= 2) {
+                    char c1 = (char)toupper(tok[1]);
+                    char c2 = (tok.size() >= 3) ? tok[2] : '\0';
+                    bool single_letter = (c2 == '\0' || c2 == '{' || isdigit((unsigned char)c2));
+                    if (single_letter && (c1 == 'G' || c1 == 'I' || c1 == 'R')) {
+                        loop_has_rate = true;
+                        break;
+                    }
+                }
+                p = next;
+            }
+        }
+        if (!loop_has_rate)
+            loop_model += rate_suffix;
     }
 
-    // --- Build loops partition (SEQ_DNA, 4 states) ---
+    cout << "INFO: Loops model: " << loop_model << endl;
+    cout << "INFO: Stems model: " << stem_model << endl;
+
+    // --- Build loops partition (SEQ_DNA, 4 states) — ID 1, matches RAxML partition [0] ---
     if (!loop_sites.empty()) {
         Alignment *loop_aln = new Alignment();
         loop_aln->extractSites(dna_aln, loop_sites);
@@ -835,6 +865,16 @@ void SuperAlignment::readPartitionRNA(Params &params) {
         loop_aln->model_name  = loop_model;
         loop_aln->aln_file    = params.aln_file;
         partitions.push_back(loop_aln);
+    }
+
+    // --- Build stems partition (SEQ_DOUBLET, 16 states) — ID 2, matches RAxML partition [1] ---
+    if (!stem_pairs.empty()) {
+        Alignment *stem_aln = new Alignment();
+        stem_aln->convertDNAToDoublet(dna_aln, stem_pairs);
+        stem_aln->name        = "stems";
+        stem_aln->model_name  = stem_model;
+        stem_aln->aln_file    = params.aln_file;
+        partitions.push_back(stem_aln);
     }
 
     delete dna_aln;
