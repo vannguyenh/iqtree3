@@ -1204,6 +1204,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.topotest_optimize_model = false;
     params.do_weighted_test = false;
     params.do_au_test = false;
+    params.au_epsilon = 0.001;
     params.siteLL_file = NULL; //added by MA
     params.partition_file = NULL;
     params.partition_type = BRLEN_OPTIMIZE;
@@ -2595,6 +2596,15 @@ void parseArg(int argc, char *argv[], Params &params) {
 			}
 			if (strcmp(argv[cnt], "-au") == 0 || strcmp(argv[cnt], "--test-au") == 0) {
 				params.do_au_test = true;
+				continue;
+			}
+			if (strcmp(argv[cnt], "--au-epsilon") == 0) {
+				cnt++;
+				if (cnt >= argc)
+					throw "Use --au-epsilon <value>";
+				params.au_epsilon = convert_double(argv[cnt]);
+				if (params.au_epsilon < 0.0)
+					throw "--au-epsilon must be non-negative";
 				continue;
 			}
 			if (strcmp(argv[cnt], "-sp") == 0 || strcmp(argv[cnt], "-Q") == 0) {
@@ -6497,6 +6507,7 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "  --test NUM           Replicates for topology test" << endl
     << "  --test-weight        Perform weighted KH and SH tests" << endl
     << "  --test-au            Approximately unbiased (AU) test (Shimodaira 2002)" << endl
+    << "  --au-epsilon NUM     Epsilon for AU test: if |deltaL| < NUM, keep tree regardless of p-value (default: 0.001)" << endl
     << "  --sitelh             Write site log-likelihoods to .sitelh file" << endl
 
     << endl << "ANCESTRAL STATE RECONSTRUCTION:" << endl
@@ -7626,6 +7637,7 @@ void Params::setDefault() {
     topotest_optimize_model = false;
     do_weighted_test = false;
     do_au_test = false;
+    au_epsilon = 0.001;
     siteLL_file = NULL; //added by MA
     partition_file = NULL;
     partition_type = BRLEN_OPTIMIZE;

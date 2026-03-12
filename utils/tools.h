@@ -1004,6 +1004,13 @@ public:
     bool do_au_test;
 
     /**
+     * log-likelihood epsilon for AU test: if |deltaL| between two trees is
+     * smaller than this value, the tree is kept in the confidence set regardless
+     * of the AU p-value (default: 0.0 = disabled)
+     */
+    double au_epsilon;
+
+    /**
             file specifying partition model
      */
     char *partition_file;
