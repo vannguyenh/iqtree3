@@ -196,7 +196,7 @@ jobs:
           cd build
           export CPPFLAGS="-I/usr/local/opt/libomp/include"
           export CXXFLAGS="-I/usr/local/opt/libomp/include"
-          cmake .. -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+          cmake .. -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DEIGEN3_INCLUDE_DIR=$(brew --prefix eigen)/include/eigen3
           make -j
           make package
           file iqtree3 | grep x86_64
