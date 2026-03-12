@@ -165,7 +165,7 @@ void IQTree::restoreUFBoot(Checkpoint *checkpoint) {
     for (id = sample_start; id != sample_end; id++) {
         checkpoint->addListElement();
         string str;
-        ASSERT(checkpoint->getString("", str));
+        checkpoint->getString("", str);
         ASSERT(!str.empty());
         stringstream ss(str);
         ss >> boot_counts[id] >> boot_logl[id] >> boot_orig_logl[id] >> boot_trees[id];
@@ -193,7 +193,8 @@ void IQTree::restoreCheckpoint() {
         for (id = 0; id < params->gbo_replicates; id++) {
             checkpoint->addListElement();
             string str;
-            ASSERT(checkpoint->getString("", str));
+            checkpoint->getString("", str);
+            ASSERT(!str.empty());
             stringstream ss(str);
             ss >> boot_counts[id] >> boot_logl[id] >> boot_orig_logl[id] >> boot_trees[id];
         }

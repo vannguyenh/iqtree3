@@ -1056,6 +1056,7 @@ uint64_t PhyloTree::getMemoryRequiredThreaded(size_t ncategory, bool full_mem) {
 }
 
 void PhyloTree::getMemoryRequired(uint64_t &partial_lh_entries, uint64_t &scale_num_entries, uint64_t &partial_pars_entries) {
+    ASSERT(model);
     // +num_states for ascertainment bias correction
     uint64_t block_size = get_safe_upper_limit(aln->getNPattern()) + get_safe_upper_limit(aln->num_states);
     if (model_factory)
@@ -1070,7 +1071,6 @@ void PhyloTree::getMemoryRequired(uint64_t &partial_lh_entries, uint64_t &scale_
         block_size *= model->getNMixtures();
         scale_size *= model->getNMixtures();
     }
-    ASSERT(model);
     uint64_t tip_partial_lh_size = aln->num_states * (aln->STATE_UNKNOWN+1) * model->getNMixtures();
     uint64_t tip_partial_pars_size = aln->num_states * (aln->STATE_UNKNOWN+1);
 
