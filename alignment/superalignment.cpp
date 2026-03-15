@@ -19,6 +19,8 @@
  ***************************************************************************/
 
 #include <stdarg.h>
+#include <stack>
+#include <fstream>
 #include "superalignment.h"
 #include "nclextra/msetsblock.h"
 #include "nclextra/myreader.h"
@@ -79,6 +81,10 @@ SuperAlignment::SuperAlignment(Params &params) : Alignment()
 }
 
 void SuperAlignment::readFromParams(Params &params) {
+    if (params.rna_structure_file) {
+        readPartitionRNA(params);
+        return;
+    }
     if (isDirectory(params.partition_file)) {
         // reading all files in the directory
         readPartitionDir(params.partition_file, params.sequence_type, params.intype, params.model_name, params.remove_empty_seq);
@@ -627,6 +633,251 @@ void SuperAlignment::readPartitionNexus(Params &params) {
     if (input_aln)
         delete input_aln;
     delete sets_block;
+}
+
+// ---------------------------------------------------------------------------
+// readPartitionRNA — build stem/loop partitions from a secondary structure file
+//
+// Accepts both simple dot-bracket files (one line, only '().<>') and raw
+// Stockholm SS_cons strings in full WUSS notation, including letter-based
+// pseudoknot levels (Aa, Bb, Cc, Dd) and all loop characters (.,_,-,:).
+// ---------------------------------------------------------------------------
+
+void SuperAlignment::readPartitionRNA(Params &params) {
+    // Read the source DNA/RNA alignment (A/C/G/U nucleotides)
+    if (!params.aln_file)
+        outError("--rna-structure requires an alignment file specified with -s");
+    Alignment *dna_aln = new Alignment((char*)params.aln_file,
+                                       (char*)"DNA", params.intype,
+                                       params.model_name);
+    int nsites = dna_aln->getNSite();
+
+    // Read the dot-bracket structure (one line, ignoring blank lines / comments)
+    ifstream ss_file(params.rna_structure_file);
+    if (!ss_file.is_open())
+        outError("Cannot open RNA structure file: " + string(params.rna_structure_file));
+    string structure;
+    while (getline(ss_file, structure)) {
+        // Skip blank lines and comment lines beginning with '#' or '>'
+        if (!structure.empty() && structure[0] != '#' && structure[0] != '>')
+            break;
+        structure.clear();
+    }
+    ss_file.close();
+    if (structure.empty())
+        outError("No dot-bracket structure found in file: " + string(params.rna_structure_file));
+
+    // WUSS (Washington University Secondary Structure) notation.
+    // Every non-whitespace character in the SS_cons string maps to exactly one
+    // alignment column.
+    //
+    // Stem characters treated as PAIRED (go to doublet/RNA partition):
+    //   '<' '>'  — stem level 1 (Rfam primary stem notation)
+    //   '(' ')'  — stem level 2
+    //   '{' '}'  — stem level 3
+    //   '[' ']'  — stem level 4
+    // All four are Watson-Crick nesting levels and are treated as stem pairs,
+    // consistent with RAxML (-S) and the original PHASE S16 model.
+    //
+    // Pseudoknot characters treated as UNPAIRED (go to loop/GTR partition),
+    // matching RAxML and PHASE which do not apply doublet substitution to
+    // topologically crossing (pseudoknot) base pairs:
+    //   'A' 'a'  — pseudoknot level A
+    //   'B' 'b'  — pseudoknot level B
+    //   'C' 'c'  — pseudoknot level C
+    //   'D' 'd'  — pseudoknot level D
+    //
+    // Loop/unpaired characters:
+    //   '.'  — unpaired
+    //   '_'  — unpaired hairpin loop
+    //   ','  — unpaired multifurcation loop
+    //   '-'  — insertion column relative to consensus
+    //   ':'  — single—stranded flanking region
+    //
+    // Whitespace is ignored (does not map to an alignment column).
+    auto isOpen  = [](char c) {
+        return c == '<' || c == '(' || c == '{' || c == '[';
+    };
+    auto isClose = [](char c) {
+        return c == '>' || c == ')' || c == '}' || c == ']';
+    };
+    auto isLoop  = [](char c) {
+        if (c == '.' || c == '_' || c == ',' || c == '-' || c == ':')
+            return true;
+        // Pseudoknot levels treated as unpaired
+        if (c == 'A' || c == 'a' || c == 'B' || c == 'b' ||
+            c == 'C' || c == 'c' || c == 'D' || c == 'd')
+            return true;
+        return false;
+    };
+    auto isSS    = [&](char c){ return isOpen(c) || isClose(c) || isLoop(c); };
+
+    int dot_len = 0;
+    for (char c : structure)
+        if (isSS(c)) dot_len++;
+    if (dot_len != nsites)
+        outError("Structure length (" + to_string(dot_len) + ") does not match "
+                 "alignment length (" + to_string(nsites) + ")");
+
+    cout << "INFO: Parsing RNA secondary structure from " << params.rna_structure_file << endl;
+    cout << "INFO: Alignment has " << nsites << " sites; structure has "
+         << dot_len << " positions" << endl;
+
+    // Parse WUSS notation (stack-based) — build stem pairs and loop sites.
+    // Each bracket type has its own independent stack so nesting levels do not
+    // interfere with each other.  Pseudoknot letter pairs (Aa-Dd) are already
+    // handled by isLoop() above and never reach the stack logic.
+    vector<pair<int,int>> stem_pairs;
+    IntVector loop_sites;
+    stack<int> stack_angle;   // '<' '>'
+    stack<int> stack_round;   // '(' ')'
+    stack<int> stack_curly;   // '{' '}'
+    stack<int> stack_square;  // '[' ']'
+
+    auto stackFor = [&](char c) -> stack<int>* {
+        if (c == '<' || c == '>') return &stack_angle;
+        if (c == '(' || c == ')') return &stack_round;
+        if (c == '{' || c == '}') return &stack_curly;
+        /* '[' or ']' */           return &stack_square;
+    };
+
+    int aln_pos = 0;
+    for (int i = 0; i < (int)structure.size(); i++) {
+        char c = structure[i];
+        if (isOpen(c)) {
+            stackFor(c)->push(aln_pos++);
+        } else if (isClose(c)) {
+            stack<int>* stk = stackFor(c);
+            if (stk->empty())
+                outError("Unmatched '" + string(1,c) + "' at structure position " + to_string(i + 1));
+            int left = stk->top();
+            stk->pop();
+            stem_pairs.push_back({left, aln_pos++});
+        } else if (isLoop(c)) {
+            loop_sites.push_back(aln_pos++);
+        }
+        // Whitespace: ignore (does not map to an alignment column)
+    }
+    if (!stack_angle.empty() || !stack_round.empty() ||
+        !stack_curly.empty() || !stack_square.empty())
+        outError("Unmatched opening bracket in RNA structure file: " + string(params.rna_structure_file));
+
+    cout << "INFO: Found " << stem_pairs.size() << " stem pairs and "
+         << loop_sites.size() << " loop sites" << endl;
+
+    // Determine model names for the two partitions.
+    //
+    // Syntax: -m <loop_model>/<stem_model>
+    //   e.g.  -m JC/RNA16+G       (JC for loops, RNA16+G for stems; +G propagated)
+    //         -m JC+I/RNA16+G     (JC+I for loops, RNA16+G for stems; no propagation)
+    //         -m RNA16+G          (no slash: loops default to GTR+F+G)
+    //
+    // Partition order: loops first (ID 1 = DNA), stems second (ID 2 = RNA).
+    // This matches RAxML: partition [0] = DNA loops, partition [1] = RNA stems.
+    //
+    // Rate-heterogeneity propagation: +G/+I/+R tokens from the stem model are
+    // appended to the loop model only when the loop side has no rate token yet.
+
+    string full_model = params.model_name.empty() ? "RNA16A" : params.model_name;
+    string stem_model, loop_model;
+
+    // --- Step 1: split on '/' ---
+    size_t slash_pos = full_model.find('/');
+    bool user_loop_model = (slash_pos != string::npos);
+    if (user_loop_model) {
+        loop_model = full_model.substr(0, slash_pos);   // left  of '/' = loops (DNA)
+        stem_model = full_model.substr(slash_pos + 1);  // right of '/' = stems (RNA)
+        if (stem_model.empty())
+            outError("--rna-structure: stem model missing after '/' in -m " + full_model);
+        if (loop_model.empty())
+            outError("--rna-structure: loop model missing before '/' in -m " + full_model);
+    } else {
+        stem_model = full_model;
+        loop_model = "";   // filled in below
+    }
+
+    // --- Step 2: extract rate tokens from the stem model ---
+    // Only +G/+I/+R tokens are collected (single letter followed by digit/'{'/end).
+    // Multi-letter model names (+GTR, +HKY, +RNA16) and frequency tokens are ignored.
+    string rate_suffix;
+    {
+        size_t plus_pos = stem_model.find('+');
+        if (plus_pos != string::npos) {
+            string mods = stem_model.substr(plus_pos);
+            size_t i = 0;
+            while (i < mods.size()) {
+                if (mods[i] == '+') {
+                    size_t next = mods.find('+', i + 1);
+                    string token = mods.substr(i, (next == string::npos) ? string::npos : next - i);
+                    bool is_rate = false;
+                    if (token.size() >= 2) {
+                        char c1 = (char)toupper(token[1]);
+                        char c2 = (token.size() >= 3) ? token[2] : '\0';
+                        bool single_letter = (c2 == '\0' || c2 == '{' || isdigit((unsigned char)c2));
+                        is_rate = single_letter && (c1 == 'G' || c1 == 'I' || c1 == 'R');
+                    }
+                    if (is_rate)
+                        rate_suffix += token;
+                    i = (next == string::npos) ? mods.size() : next;
+                } else {
+                    i++;
+                }
+            }
+        }
+    }
+
+    // --- Step 3: build the final loop model string ---
+    if (!user_loop_model) {
+        // No slash: default loop model is GTR+F with the stem rate suffix
+        loop_model = "GTR+F" + rate_suffix;
+    } else if (!rate_suffix.empty()) {
+        // Slash given: propagate rate suffix only if loop side has no rate token yet
+        bool loop_has_rate = false;
+        {
+            size_t p = loop_model.find('+');
+            while (p != string::npos) {
+                size_t next = loop_model.find('+', p + 1);
+                string tok = loop_model.substr(p, (next == string::npos) ? string::npos : next - p);
+                if (tok.size() >= 2) {
+                    char c1 = (char)toupper(tok[1]);
+                    char c2 = (tok.size() >= 3) ? tok[2] : '\0';
+                    bool single_letter = (c2 == '\0' || c2 == '{' || isdigit((unsigned char)c2));
+                    if (single_letter && (c1 == 'G' || c1 == 'I' || c1 == 'R')) {
+                        loop_has_rate = true;
+                        break;
+                    }
+                }
+                p = next;
+            }
+        }
+        if (!loop_has_rate)
+            loop_model += rate_suffix;
+    }
+
+    cout << "INFO: Loops model: " << loop_model << endl;
+    cout << "INFO: Stems model: " << stem_model << endl;
+
+    // --- Build loops partition (SEQ_DNA, 4 states) — ID 1, matches RAxML partition [0] ---
+    if (!loop_sites.empty()) {
+        Alignment *loop_aln = new Alignment();
+        loop_aln->extractSites(dna_aln, loop_sites);
+        loop_aln->name        = "loops";
+        loop_aln->model_name  = loop_model;
+        loop_aln->aln_file    = params.aln_file;
+        partitions.push_back(loop_aln);
+    }
+
+    // --- Build stems partition (SEQ_DOUBLET, 16 states) — ID 2, matches RAxML partition [1] ---
+    if (!stem_pairs.empty()) {
+        Alignment *stem_aln = new Alignment();
+        stem_aln->convertDNAToDoublet(dna_aln, stem_pairs);
+        stem_aln->name        = "stems";
+        stem_aln->model_name  = stem_model;
+        stem_aln->aln_file    = params.aln_file;
+        partitions.push_back(stem_aln);
+    }
+
+    delete dna_aln;
 }
 
 void SuperAlignment::readPartitionDir(string partition_dir, char *sequence_type,

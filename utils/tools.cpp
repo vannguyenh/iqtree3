@@ -1206,6 +1206,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.do_au_test = false;
     params.siteLL_file = NULL; //added by MA
     params.partition_file = NULL;
+    params.rna_structure_file = NULL;
     params.partition_type = BRLEN_OPTIMIZE;
     params.partfinder_rcluster = 10; // change the default from 100 to 10
     params.partfinder_rcluster_max = 0;
@@ -2597,6 +2598,13 @@ void parseArg(int argc, char *argv[], Params &params) {
 				params.do_au_test = true;
 				continue;
 			}
+			if (strcmp(argv[cnt], "--rna-structure") == 0) {
+				cnt++;
+				if (cnt >= argc)
+					throw "Use --rna-structure <structure_file>";
+				params.rna_structure_file = argv[cnt];
+				continue;
+			}
 			if (strcmp(argv[cnt], "-sp") == 0 || strcmp(argv[cnt], "-Q") == 0) {
 				cnt++;
 				if (cnt >= argc)
@@ -2652,6 +2660,7 @@ void parseArg(int argc, char *argv[], Params &params) {
                     params.partition_type = BRLEN_OPTIMIZE;
                 else
                     throw "Use --edge equal|scale|unlink";
+                continue;
             }
             
             if (strcmp(argv[cnt], "-rcluster") == 0 || strcmp(argv[cnt], "--rcluster") == 0) {

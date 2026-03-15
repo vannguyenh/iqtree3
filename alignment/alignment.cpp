@@ -2096,6 +2096,8 @@ SeqType Alignment::getSeqType(const char *sequence_type) {
         user_seq_type = SEQ_CODON;
     } else if (strcmp(sequence_type, "GT") == 0) {
         user_seq_type = SEQ_GENOTYPE;
+    } else if (strcmp(sequence_type, "DOUBLET") == 0 || strcmp(sequence_type, "RNA16") == 0) {
+        user_seq_type = SEQ_DOUBLET;
     }
     return user_seq_type;
 }
@@ -2119,6 +2121,9 @@ string Alignment::getSeqTypeStr(SeqType sequence_type) {
             break;
         case SEQ_GENOTYPE:
             return "GT";
+            break;
+        case SEQ_DOUBLET:
+            return "DOUBLET";
             break;
         default:
             return "";
@@ -3936,6 +3941,60 @@ void Alignment::convertToCodonOrAA(Alignment *aln, char *gene_code_id, bool nt2a
     	if (it->at(0) == -1)
     		ASSERT(0);
 
+}
+
+// ---------------------------------------------------------------------------
+// convertDNAToDoublet — build a 16-state RNA doublet alignment from a DNA
+// alignment and a list of paired column indices (one pair per stem).
+// ---------------------------------------------------------------------------
+
+void Alignment::convertDNAToDoublet(Alignment *aln, vector<pair<int,int>> &pairs) {
+    if (aln->seq_type != SEQ_DNA)
+        outError("convertDNAToDoublet: source alignment must be of type DNA");
+    if (pairs.empty())
+        outError("convertDNAToDoublet: no stem pairs provided");
+
+    // Copy sequence names and metadata from source alignment
+    for (size_t i = 0; i < aln->getNSeq(); i++)
+        seq_names.push_back(aln->getSeqName(i));
+    name          = aln->name;
+    model_name    = aln->model_name;
+    aln_file      = aln->aln_file;
+    sequence_type = "DOUBLET";
+    seq_type      = SEQ_DOUBLET;
+    num_states    = 16;
+    computeUnknownState();   // sets STATE_UNKNOWN = num_states = 16
+
+    site_pattern.resize(pairs.size(), -1);
+    clear();
+    pattern_index.clear();
+
+    size_t nseq = aln->getNSeq();
+    VerboseMode save_mode = verbose_mode;
+    verbose_mode = min(verbose_mode, VB_MIN); // suppress per-site gap messages
+
+    Pattern pat;
+    pat.resize(nseq);
+    for (size_t p = 0; p < pairs.size(); p++) {
+        int col_left  = pairs[p].first;
+        int col_right = pairs[p].second;
+        for (size_t s = 0; s < nseq; s++) {
+            StateType s1 = aln->at(aln->getPatternID(col_left))[s];
+            StateType s2 = aln->at(aln->getPatternID(col_right))[s];
+            if (s1 < 4 && s2 < 4)
+                pat[s] = s1 * 4 + s2;   // doublet state: 0-15
+            else
+                pat[s] = STATE_UNKNOWN;  // gap, ambiguous, or unknown
+        }
+        addPattern(pat, p);
+    }
+
+    verbose_mode = save_mode;
+    countConstSite();
+    // Sanity check: all patterns must have at least one non-(-1) entry
+    for (iterator it = begin(); it != end(); it++)
+        if (it->at(0) == -1)
+            ASSERT(0);
 }
 
 Alignment *Alignment::convertCodonToAA() {
