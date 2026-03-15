@@ -701,7 +701,7 @@ void AliSimulator::getStateFrequenciesFromModel(IQTree* tree, double *state_freq
         // if sequence_type is genotype -> use biologically realistic frequencies
         else if (tree->aln->seq_type == SEQ_GENOTYPE)
         {
-            double hom_ratio = 0.90;
+            double hom_ratio = 0.95;
             double het_ratio = 1.0 - hom_ratio;
 
             int num_states = tree->aln->getMaxNumStates();
