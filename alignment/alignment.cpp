@@ -2061,70 +2061,16 @@ char Alignment::convertStateBack(char state) {
             } else {
                 return '-';
             }
+        case SEQ_GENOTYPE:
+            // genotype state
+            if (state < strlen(symbols_genotype)) {
+                return symbols_genotype[(int)state];
+            } else {
+                return '-';
+            }
         default:
             return STATE_INVALID;
         }
-    case SEQ_DNA: // DNA
-        switch (state) {
-        case 0:
-            return 'A';
-        case 1:
-            return 'C';
-        case 2:
-            return 'G';
-        case 3:
-            return 'T';
-        case 1+4+3:
-            return 'R'; // A or G, Purine
-        case 2+8+3:
-            return 'Y'; // C or T, Pyrimidine
-        case 1+8+3:
-            return 'W'; // A or T, Weak
-        case 2+4+3:
-            return 'S'; // G or C, Strong
-        case 1+2+3:
-            return 'M'; // A or C, Amino
-        case 4+8+3:
-            return 'K'; // G or T, Keto
-        case 2+4+8+3:
-            return 'B'; // C or G or T
-        case 1+2+8+3:
-            return 'H'; // A or C or T
-        case 1+4+8+3:
-            return 'D'; // A or G or T
-        case 1+2+4+3:
-            return 'V'; // A or G or C
-        default:
-            return '?'; // unrecognize character
-        }
-        return state;
-    case SEQ_PROTEIN: // Protein
-        if (state < 20)
-            return symbols_protein[(int)state];
-		else if (state == 20) return 'B';
-		else if (state == 21) return 'Z';
-		else if (state == 22) return 'J';
-//		else if (state == 4+8+19) return 'B';
-//		else if (state == 32+64+19) return 'Z';
-        else
-            return '-';
-    case SEQ_MORPH:
-    	// morphological state
-        if (state < strlen(symbols_morph))
-            return symbols_morph[(int)state];
-        else
-            return '-';
-    case SEQ_GENOTYPE:
-        // genotype state
-        if (state < strlen(symbols_genotype))
-            return symbols_genotype[(int)state];
-        else
-            return '-';
-
-    default:
-    	// unknown
-    	return '*';
-    }
 }
 
 string Alignment::convertStateBackStr(StateType state) {
