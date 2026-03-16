@@ -701,7 +701,12 @@ void AliSimulator::getStateFrequenciesFromModel(IQTree* tree, double *state_freq
         // if sequence_type is genotype -> use biologically realistic frequencies
         else if (tree->aln->seq_type == SEQ_GENOTYPE)
         {
-            double hom_ratio = 0.95;
+            // Use user-specified homozygous ratio if provided, otherwise draw randomly from [0.9, 0.99]
+            double hom_ratio;
+            if (params->alisim_genotype_hom_ratio > 0)
+                hom_ratio = params->alisim_genotype_hom_ratio; // -1 means "use random"
+            else
+                hom_ratio = 0.9 + random_double() * 0.09;
             double het_ratio = 1.0 - hom_ratio;
 
             int num_states = tree->aln->getMaxNumStates();

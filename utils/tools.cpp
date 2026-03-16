@@ -1580,6 +1580,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.alisim_num_taxa_uniform_start = -1;
     params.alisim_num_taxa_uniform_end = -1;
     params.alisim_length_ratio = 2;
+    params.alisim_genotype_hom_ratio = -1;
     params.birth_rate = 0.8;
     params.death_rate = 0.2;
     params.alisim_fundi_proportion = 0.0;
@@ -3057,6 +3058,15 @@ void parseArg(int argc, char *argv[], Params &params) {
                     params.alisim_stationarity_heterogeneity = UNSPECIFIED;
                 else
                     throw "Use --site-freq MEAN/SAMPLING/MODEL";
+                continue;
+            }
+            if (strcmp(argv[cnt], "--gt-hom-ratio") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --gt-hom-ratio <RATIO> where RATIO is in [0.7, 1.0)";
+                params.alisim_genotype_hom_ratio = convert_double(argv[cnt]);
+                if (params.alisim_genotype_hom_ratio <= 0.7 || params.alisim_genotype_hom_ratio >= 1.0)
+                    throw "The homozygous ratio (--gt-hom-ratio) must be in [0.7, 1.0)";
                 continue;
             }
             if (strcmp(argv[cnt], "--indel") == 0) {

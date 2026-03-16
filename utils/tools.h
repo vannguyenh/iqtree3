@@ -2652,7 +2652,14 @@ public:
     *  default is 2.0;
     */
     double alisim_length_ratio;
-    
+
+    /**
+    *  genotype simulation - ratio of total frequency assigned to homozygous states (AA, CC, GG, TT)
+    *  valid range: [0.7, 1.0)
+    *  default is -1 (meaning: randomly drawn from [0.9, 0.99])
+    */
+    double alisim_genotype_hom_ratio;
+
     /**
     *  fundi model - set of taxa
     */
