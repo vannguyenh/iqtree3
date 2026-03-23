@@ -1973,6 +1973,20 @@ string Alignment::convertStateBackStr(StateType state) {
         str += symbols_dna[state%4];
         return str;
 	}
+    if (seq_type == SEQ_DOUBLET) {
+        if (num_states == 7) {
+            static const char* rna7_names[] = {"AU", "UA", "CG", "GC", "GU", "UG", "MM"};
+            if (state < 7) return rna7_names[state];
+            return "??";
+        }
+        static const char* bases = "ACGU";
+        if (state < 16) {
+            str = bases[state >> 2];
+            str += bases[state & 3];
+            return str;
+        }
+        return "??";
+    }
 
     // all other data types
     str = convertStateBack(state);
@@ -2096,7 +2110,7 @@ SeqType Alignment::getSeqType(const char *sequence_type) {
         user_seq_type = SEQ_CODON;
     } else if (strcmp(sequence_type, "GT") == 0) {
         user_seq_type = SEQ_GENOTYPE;
-    } else if (strcmp(sequence_type, "DOUBLET") == 0 || strcmp(sequence_type, "RNA16") == 0) {
+    } else if (strcmp(sequence_type, "DOUBLET") == 0) {
         user_seq_type = SEQ_DOUBLET;
     }
     return user_seq_type;
@@ -3995,6 +4009,62 @@ void Alignment::convertDNAToDoublet(Alignment *aln, vector<pair<int,int>> &pairs
     for (iterator it = begin(); it != end(); it++)
         if (it->at(0) == -1)
             ASSERT(0);
+}
+
+// ---------------------------------------------------------------------------
+// convertDoubletToRNA7 — collapse a 16-state doublet alignment into 7 states:
+//   0=AU, 1=UA, 2=CG, 3=GC, 4=GU, 5=UG, 6=MM (all 10 mismatches lumped)
+// ---------------------------------------------------------------------------
+
+void Alignment::convertDoubletToRNA7(Alignment *aln) {
+    if (aln->seq_type != SEQ_DOUBLET || aln->num_states != 16)
+        outError("convertDoubletToRNA7: source must be a 16-state doublet alignment");
+
+    // Mapping from 16-state doublet index to RNA7 state index.
+    // Canonical pairs: AU(3)->0, UA(12)->1, CG(6)->2, GC(9)->3, GU(11)->4, UG(14)->5
+    // All non-canonical (mismatches): ->6
+    static const int doublet_to_rna7[16] = {
+        6, 6, 6, 0,   // AA=6, AC=6, AG=6, AU=0
+        6, 6, 2, 6,   // CA=6, CC=6, CG=2, CU=6
+        6, 3, 6, 4,   // GA=6, GC=3, GG=6, GU=4
+        1, 6, 5, 6    // UA=1, UC=6, UG=5, UU=6
+    };
+
+    // Copy sequence names and metadata from source alignment
+    for (size_t i = 0; i < aln->getNSeq(); i++)
+        seq_names.push_back(aln->getSeqName(i));
+    name          = aln->name;
+    model_name    = aln->model_name;
+    aln_file      = aln->aln_file;
+    sequence_type = "DOUBLET";
+    seq_type      = SEQ_DOUBLET;
+    num_states    = 7;
+    computeUnknownState();   // sets STATE_UNKNOWN = num_states = 7
+
+    site_pattern.resize(aln->getNSite(), -1);
+    clear();
+    pattern_index.clear();
+
+    size_t nseq = aln->getNSeq();
+    VerboseMode save_mode = verbose_mode;
+    verbose_mode = min(verbose_mode, VB_MIN);
+
+    Pattern pat;
+    pat.resize(nseq);
+    for (size_t site = 0; site < aln->getNSite(); site++) {
+        int ptn_id = aln->getPatternID(site);
+        for (size_t s = 0; s < nseq; s++) {
+            StateType st = aln->at(ptn_id)[s];
+            if (st < 16)
+                pat[s] = doublet_to_rna7[st];
+            else
+                pat[s] = STATE_UNKNOWN;
+        }
+        addPattern(pat, site);
+    }
+
+    verbose_mode = save_mode;
+    countConstSite();
 }
 
 Alignment *Alignment::convertCodonToAA() {
