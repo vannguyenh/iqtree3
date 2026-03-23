@@ -867,10 +867,23 @@ void SuperAlignment::readPartitionRNA(Params &params) {
         partitions.push_back(loop_aln);
     }
 
-    // --- Build stems partition (SEQ_DOUBLET, 16 states) — ID 2, matches RAxML partition [1] ---
+    // --- Build stems partition — ID 2, matches RAxML partition [1] ---
+    // If the user specified an RNA7 model, collapse to 7 states; otherwise keep 16.
     if (!stem_pairs.empty()) {
-        Alignment *stem_aln = new Alignment();
-        stem_aln->convertDNAToDoublet(dna_aln, stem_pairs);
+        Alignment *stem_aln_16 = new Alignment();
+        stem_aln_16->convertDNAToDoublet(dna_aln, stem_pairs);
+
+        bool is_rna7 = (stem_model.find("RNA7") != string::npos);
+
+        Alignment *stem_aln;
+        if (is_rna7) {
+            stem_aln = new Alignment();
+            stem_aln->convertDoubletToRNA7(stem_aln_16);
+            delete stem_aln_16;
+        } else {
+            stem_aln = stem_aln_16;
+        }
+
         stem_aln->name        = "stems";
         stem_aln->model_name  = stem_model;
         stem_aln->aln_file    = params.aln_file;

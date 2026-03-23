@@ -1560,7 +1560,7 @@ void reportPhyloAnalysis(Params &params, IQTree &tree, ModelCheckpoint &model_in
                 case SEQ_PROTEIN: out << "AA"; break;
                 case SEQ_POMO: out << "POMO"; break;
                 case SEQ_GENOTYPE: out << "GT"; break;
-                case SEQ_DOUBLET: out << "RNA"; break;
+                case SEQ_DOUBLET: out << ((*it)->aln->num_states == 7 ? "RNA7" : "RNA16"); break;
                 case SEQ_UNKNOWN: out << "???"; break;
                 }
                 out << "\t" << (*it)->aln->getNSeq() << "\t" << (*it)->aln->getNSite()
@@ -5572,7 +5572,7 @@ bool runCMaple(Params &params)
             const cmaple::Tree::TreeSearchType tree_search_type = cmaple::Tree::parseTreeSearchType(params.tree_search_type_str);
             std::ostream null_stream(0);
             std::ostream& out_stream = cmaple::verbose_mode >= cmaple::VB_MED ? std::cout : null_stream;
-            tree.infer(tree_search_type, params.shallow_tree_search, out_stream);
+            tree.infer(params.num_threads, tree_search_type, params.shallow_tree_search, out_stream);
 
             // Compute branch supports (if users want to do so)
             if (params.aLRT_replicates)
