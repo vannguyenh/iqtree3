@@ -126,8 +126,8 @@ private:
     /** @return true if this is an RNA7 family variant. */
     bool isRNA7() const { return variant >= RNA7A && variant <= RNA7F; }
 
-    /** @return true if this is a full GTR variant (RNA16 or RNA7A). */
-    bool isFullGTR() const { return variant == RNA16 || variant == RNA7A; }
+    /** @return true if this is a full GTR variant (all rates free). */
+    bool isFullGTR() const { return variant == RNA16 || variant == RNA7A || variant == RNA7B; }
 
     // For full GTR variants: maps optimizer slot i (1-based) to rates[] index.
     // Length = num_params.  Forbidden rates are skipped in this mapping.

@@ -458,7 +458,8 @@ void ModelMarkov::report_state_freqs(ostream& out, double *custom_state_freq) {
                 break;
             }
         }
-    } else if (num_states == 16) {
+    } else if (num_states == 16 && phylo_tree && phylo_tree->aln &&
+               phylo_tree->aln->seq_type == SEQ_DOUBLET) {
         // RNA 16-state doublet model: states encoded as b1*4+b2 (A=0,C=1,G=2,U=3)
         static const char* bases = "ACGU";
         out << setprecision(4);
@@ -467,6 +468,17 @@ void ModelMarkov::report_state_freqs(ostream& out, double *custom_state_freq) {
             out << "  " << bases[i>>2] << bases[i&3] << ": " << f[i];
             if (i % 4 == 3) out << endl;
         }
+    } else if (num_states == 7 && phylo_tree && phylo_tree->aln &&
+               phylo_tree->aln->seq_type == SEQ_DOUBLET) {
+        // RNA 7-state collapsed doublet model
+        static const char* rna7_names[] = {"AU", "UA", "CG", "GC", "GU", "UG", "MM"};
+        out << setprecision(4);
+        out << "RNA7 state frequencies:" << endl;
+        for (int i = 0; i < 7; i++) {
+            out << "  " << rna7_names[i] << ": " << f[i];
+            if ((i + 1) % 4 == 0) out << endl;
+        }
+        out << endl;
     }
 }
 
