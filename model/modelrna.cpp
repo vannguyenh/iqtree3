@@ -129,8 +129,8 @@ static int computeSymVecEntry(int i, int j) {
 // RNA7 state-to-doublet mapping
 // -----------------------------------------------------------------------
 
-const int ModelRNA::rna7_to_doublet[7] = {3, 12, 6, 9, 11, 14, 0};
-// State 0=AU(3), 1=UA(12), 2=CG(6), 3=GC(9), 4=GU(11), 5=UG(14), 6=MM(0=AA)
+const int ModelRNA::rna7_to_doublet[7] = {3, 6, 9, 11, 12, 14, 0};
+// RAxML ordering: 0=AU(3), 1=CG(6), 2=GC(9), 3=GU(11), 4=UA(12), 5=UG(14), 6=MM(0=AA)
 
 // -----------------------------------------------------------------------
 // getRNA7SymmetrySpec
@@ -162,7 +162,7 @@ void ModelRNA::getRNA7SymmetrySpec(int *sym_vec, int *freq_group) const {
 
     // Default: all frequencies independent
     static const int freq_indep[7] = {0, 1, 2, 3, 4, 5, 6};
-    // Strand-symmetric: AU~GU, UA~UG, CG shares with nothing special, GC likewise, MM separate
+    // Strand-symmetric: AU~UA (group 0), CG~GC (group 2), GU~UG (group 1), MM (group 3)
     static const int freq_strand[7] = {0, 2, 2, 1, 0, 1, 3};
 
     switch (variant) {
@@ -309,29 +309,103 @@ void ModelRNA::applySymmetryVector() {
         return;
     }
 
-    // --- Constrained model: build rate-type string from symmetry rules ---
+    // --- Constrained model: apply symmetry rules ---
     //
-    // For RNA16 variants: compute each entry from biological rules.
-    // For RNA7 variants (RNA7C..RNA7F): use RAxML symmetry vectors.
+    // For RNA16 variants: build a rate-type string from biological rules and
+    // delegate to setRateType().  RNA16 has at most 5 classes (0-4), well
+    // within the single-digit encoding limit.
     //
-    // Forbidden entries (class -1) use sentinel '9'.
+    // For RNA7 variants (RNA7C..RNA7F): directly build param_spec, param_fixed,
+    // and num_params from the symmetry vector.  This avoids the single-digit
+    // encoding of setRateType() which cannot distinguish forbidden sentinel '9'
+    // from rate class 9 when a model has 10 rate classes (e.g. RNA7C).
 
     bool is7 = isRNA7();
 
-    string rate_str(nrates, '0');
-
     if (is7) {
-        // RNA7C..RNA7F: use the RAxML symmetry spec
+        // --- RNA7 constrained models: direct param_spec construction ---
         int sym_vec[21], freq_group[7];
         getRNA7SymmetrySpec(sym_vec, freq_group);
+
+        // Find the reference class (highest-numbered non-forbidden class).
+        // This class will be fixed at rate 1.0.
+        int ref_class = -1;
+        for (int k = 0; k < 21; k++)
+            if (sym_vec[k] > ref_class) ref_class = sym_vec[k];
+        ASSERT(ref_class >= 0 && "RNA7 symmetry vector has no valid rate classes");
+
+        // Assign param IDs:
+        //   ref_class → ID 0 (reference, fixed at 1.0)
+        //   forbidden (-1) → ID (ref_class+1), a separate fixed ID with rate 0.0
+        //   other classes → IDs 1..ref_class, ordered by class number
+        //
+        // For a model with classes 0..ref_class and some forbidden entries:
+        //   num_params = ref_class (number of free rate parameters)
+        //   param_fixed[0] = true  (reference)
+        //   param_fixed[forbidden_id] = true  (if forbidden entries exist)
+
+        bool has_forbidden = false;
+        for (int k = 0; k < 21 && !has_forbidden; k++)
+            if (sym_vec[k] == -1) has_forbidden = true;
+
+        int forbidden_param_id = has_forbidden ? (ref_class + 1) : -1;
+        int total_ids = has_forbidden ? (ref_class + 2) : (ref_class + 1);
+
+        // Build param_spec: map each rate entry to its param ID
+        param_spec.clear();
         for (int k = 0; k < 21; k++) {
-            if (sym_vec[k] == -1)
-                rate_str[k] = '9';       // sentinel for forbidden pairs
+            int cls = sym_vec[k];
+            int id;
+            if (cls == -1)
+                id = forbidden_param_id;
+            else if (cls == ref_class)
+                id = 0;
+            else if (cls < ref_class)
+                id = cls + 1;  // classes 0..ref_class-1 map to IDs 1..ref_class
             else
-                rate_str[k] = '0' + sym_vec[k];
+                id = cls;      // shouldn't happen, but be safe
+            param_spec.push_back((char)id);
         }
+
+        // Set up param_fixed
+        param_fixed.assign(total_ids, false);
+        param_fixed[0] = true;  // reference class fixed at 1.0
+        if (has_forbidden)
+            param_fixed[forbidden_param_id] = true;
+
+        // Count free params (unfixed)
+        num_params = 0;
+        for (int i = 0; i < total_ids; i++)
+            if (!param_fixed[i]) num_params++;
+
+        // Average rates within each param group and normalize by reference
+        vector<double> avg_rates(total_ids, 0.0);
+        vector<int> num_rates_per_id(total_ids, 0);
+        for (int k = 0; k < 21; k++) {
+            int id = (unsigned char)param_spec[k];
+            avg_rates[id] += rates[k];
+            num_rates_per_id[id]++;
+        }
+        for (int i = 0; i < total_ids; i++)
+            if (num_rates_per_id[i] > 0)
+                avg_rates[i] /= num_rates_per_id[i];
+        // Normalize so reference class = 1.0
+        double ref_rate = avg_rates[0];
+        for (int k = 0; k < 21; k++) {
+            int id = (unsigned char)param_spec[k];
+            if (ref_rate > 0.0)
+                rates[k] = avg_rates[id] / ref_rate;
+            else
+                rates[k] = avg_rates[id];
+        }
+
+        // Force forbidden rates to 0.0
+        for (int k = 0; k < 21; k++)
+            if (sym_vec[k] == -1)
+                rates[k] = 0.0;
     } else {
-        // RNA16A or RNA16B
+        // --- RNA16A / RNA16B: use setRateType (max 5 rate classes, safe) ---
+        string rate_str(nrates, '0');
         bool equalRates = (variant == RNA16B);
         int k = 0;
         for (int i = 0; i < n; i++) {
@@ -345,45 +419,36 @@ void ModelRNA::applySymmetryVector() {
                     rate_str[k] = '0' + cls;
             }
         }
-    }
 
-    bool ok = setRateType(rate_str);
-    ASSERT(ok && "ModelRNA: setRateType failed");
+        bool ok = setRateType(rate_str);
+        ASSERT(ok && "ModelRNA: setRateType failed");
 
-    // Find the param_spec id used for forbidden entries (sentinel '9').
-    // Mark it fixed and renumber all higher ids down by one so that the
-    // free-parameter ids remain contiguous (required by ModelDNA optimizer).
-    // Models without forbidden transitions (RNA7D, RNA7F, RNA16B) will
-    // have forbidden_id = -1 and skip this block.
-    int forbidden_id = -1;
-    for (int k = 0; k < nrates && forbidden_id == -1; k++) {
-        if (rate_str[k] == '9' && !param_spec.empty())
-            forbidden_id = (unsigned char)param_spec[k];
-    }
-
-    if (forbidden_id > 0 && forbidden_id <= num_params &&
-            !param_fixed[forbidden_id]) {
-        param_fixed[forbidden_id] = true;
-        num_params--;
-        for (char &c : param_spec) {
-            int id = (unsigned char)c;
-            if (id > forbidden_id)
-                c = (char)(id - 1);
+        // Find the param_spec id used for forbidden entries (sentinel '9').
+        // Mark it fixed and renumber all higher ids down by one so that the
+        // free-parameter ids remain contiguous (required by ModelDNA optimizer).
+        // Models without forbidden transitions (RNA16B) skip this block.
+        int forbidden_id = -1;
+        for (int k2 = 0; k2 < nrates && forbidden_id == -1; k2++) {
+            if (rate_str[k2] == '9' && !param_spec.empty())
+                forbidden_id = (unsigned char)param_spec[k2];
         }
-        for (int id = forbidden_id; id <= num_params; id++)
-            param_fixed[id] = param_fixed[id + 1];
-        param_fixed.resize(num_params + 1);
-    }
 
-    // Force forbidden transition rates to exactly 0.0.
-    if (is7) {
-        int sym_vec[21], freq_group_dummy[7];
-        getRNA7SymmetrySpec(sym_vec, freq_group_dummy);
-        for (int k = 0; k < 21; k++)
-            if (sym_vec[k] == -1)
-                rates[k] = 0.0;
-    } else {
-        int k = 0;
+        if (forbidden_id > 0 && forbidden_id <= num_params &&
+                !param_fixed[forbidden_id]) {
+            param_fixed[forbidden_id] = true;
+            num_params--;
+            for (char &c : param_spec) {
+                int id = (unsigned char)c;
+                if (id > forbidden_id)
+                    c = (char)(id - 1);
+            }
+            for (int id = forbidden_id; id <= num_params; id++)
+                param_fixed[id] = param_fixed[id + 1];
+            param_fixed.resize(num_params + 1);
+        }
+
+        // Force forbidden transition rates to exactly 0.0.
+        k = 0;
         for (int i = 0; i < n; i++)
             for (int j = i + 1; j < n; j++, k++)
                 if (computeSymVecEntry(i, j) == -1)
@@ -630,37 +695,8 @@ string ModelRNA::getName() {
 }
 
 string ModelRNA::getNameParams(bool show_fixed_params) {
-    // Delegate to ModelDNA which formats using param_spec class values
-    // but prepend our model name
     ostringstream oss;
     oss << rna_model_name;
-    if (!isFullGTR() && variant != RNA16B && num_params > 0) {
-        // Show the free rate class values (skip reference class and forbidden class)
-        oss << "{";
-        bool first = true;
-        int nrates = num_states * (num_states - 1) / 2;
-        for (int i = 0; i < nrates; i++) {
-            if (!param_spec.empty() && (int)param_spec[i] > 0 && !param_fixed[(int)param_spec[i]]) {
-                if (rates[i] == 0.0) continue; // skip forbidden class (rate forced to 0)
-                // find the first occurrence of each free class
-                bool already = false;
-                for (int j = 0; j < i; j++) {
-                    if (!param_spec.empty() && param_spec[j] == param_spec[i]) {
-                        already = true;
-                        break;
-                    }
-                }
-                if (!already) {
-                    if (!first) oss << ",";
-                    oss << rates[i];
-                    first = false;
-                }
-            }
-        }
-        oss << "}";
-    }
-    // RNA16B has 0 free rate params: no rate block needed
-    // Append frequency block (+F{...}) for all variants
     getNameParamsFreq(oss);
     return oss.str();
 }
@@ -684,32 +720,40 @@ void ModelRNA::saveCheckpoint() {
 void ModelRNA::restoreCheckpoint() {
     int n = num_states;
     int nrates = n * (n - 1) / 2;
-    ModelDNA::restoreCheckpoint();
-    startCheckpoint();
-    CKP_ARRAY_RESTORE(nrates, rates);
-    endCheckpoint();
-    // For constrained models: re-zero forbidden transitions after restore.
-    if (!isFullGTR()) {
-        bool is7 = isRNA7();
-        if (is7) {
-            int sym_vec[21], freq_group_dummy[7];
-            getRNA7SymmetrySpec(sym_vec, freq_group_dummy);
-            for (int k = 0; k < 21; k++)
-                if (sym_vec[k] == -1)
-                    rates[k] = 0.0;
-        } else {
+
+    if (isRNA7() && !isFullGTR()) {
+        // For RNA7 constrained models (RNA7C..RNA7F), bypass
+        // ModelDNA::restoreCheckpoint() because it calls setRateType()
+        // which cannot handle param_spec IDs > 9.  Instead, restore
+        // the Markov-level data directly and rebuild param_spec ourselves.
+        ModelMarkov::restoreCheckpoint();
+        // Restore the RNA rates from our own checkpoint block
+        startCheckpoint();
+        CKP_ARRAY_RESTORE(nrates, rates);
+        endCheckpoint();
+        // Rebuild param_spec, param_fixed, num_params from symmetry vector
+        applySymmetryVector();
+    } else {
+        // RNA16 variants and full-GTR RNA7 (RNA7A, RNA7B): safe to use
+        // ModelDNA::restoreCheckpoint() which calls setRateType() internally.
+        ModelDNA::restoreCheckpoint();
+        startCheckpoint();
+        CKP_ARRAY_RESTORE(nrates, rates);
+        endCheckpoint();
+        // For constrained RNA16 models: re-zero forbidden transitions.
+        if (!isFullGTR()) {
             int k = 0;
             for (int i = 0; i < n; i++)
                 for (int j = i + 1; j < n; j++, k++)
                     if (computeSymVecEntry(i, j) == -1)
                         rates[k] = 0.0;
         }
-    }
-    // For full GTR: rebuild free-index list.
-    if (isFullGTR()) {
-        rna_free_indices.clear();
-        for (int k = 0; k < nrates - 1; k++)
-            rna_free_indices.push_back(k);
+        // For full GTR: rebuild free-index list.
+        if (isFullGTR()) {
+            rna_free_indices.clear();
+            for (int k = 0; k < nrates - 1; k++)
+                rna_free_indices.push_back(k);
+        }
     }
     decomposeRateMatrix();
     if (phylo_tree) phylo_tree->clearAllPartialLH();

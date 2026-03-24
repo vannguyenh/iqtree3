@@ -18,7 +18,7 @@
  *     12=UA 13=UC 14=UG 15=UU                                             *
  *                                                                         *
  *   State encoding for RNA7 (0-6):                                        *
- *     0=AU 1=UA 2=CG 3=GC 4=GU 5=UG 6=MM                                *
+ *     0=AU 1=CG 2=GC 3=GU 4=UA 5=UG 6=MM  (RAxML ordering)              *
  *                                                                         *
  *   Parameter counts (free params):                                       *
  *     RNA16:  119 free rates + 15 free freqs = 134                        *

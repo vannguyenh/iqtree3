@@ -471,7 +471,7 @@ void ModelMarkov::report_state_freqs(ostream& out, double *custom_state_freq) {
     } else if (num_states == 7 && phylo_tree && phylo_tree->aln &&
                phylo_tree->aln->seq_type == SEQ_DOUBLET) {
         // RNA 7-state collapsed doublet model
-        static const char* rna7_names[] = {"AU", "UA", "CG", "GC", "GU", "UG", "MM"};
+        static const char* rna7_names[] = {"AU", "CG", "GC", "GU", "UA", "UG", "MM"};
         out << setprecision(4);
         out << "RNA7 state frequencies:" << endl;
         for (int i = 0; i < 7; i++) {
