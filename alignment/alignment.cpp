@@ -1731,7 +1731,7 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
     size_t sequenceCount = sequences.size();
     std::unordered_set<char> proper_nucleotides = {'A', 'C', 'G', 'T', 'U'};
     std::unordered_set<char> nucleotides = {'A', 'C', 'G', 'T', 'U', 'R', 'Y', 'W', 'S', 'M', 'K', 'B', 'H', 'D', 'V', 'N', 'X'};
-    std::unordered_set<char> di_nucleotides = {'M', 'R', 'W', 'S', 'Y', 'K', '!', '"', '@', '$', '%', '&', 'N'};
+    std::unordered_set<char> di_nucleotides = {'M', 'R', 'W', 'S', 'Y', 'K', '!', '"', '#', '$', '%', '&', 'N'};
     std::unordered_set<char> proper_amino_acids = {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S',  'T', 'W', 'Y', 'V'};
     std::unordered_set<char> binaries = {'0', '1'};
 //    std::unordered_set<char> gap_miss = {'?', '-', '.', '~'};
@@ -2503,7 +2503,7 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
 void processSeq(string &sequence, string &line, int line_num) {
     int exclam_found = false;
     std::unordered_set<char> gap_miss = {'-', '?', '.', '*', '~'};
-    std::unordered_set<char> genotype = {'"', '@', '$', '%', '&', '!'};
+    std::unordered_set<char> genotype = {'"', '#', '$', '%', '&', '!'};
     for (string::iterator it = line.begin(); it != line.end(); it++) {
         if ((*it) <= ' ') {
             continue;
