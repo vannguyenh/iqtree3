@@ -1975,7 +1975,7 @@ string Alignment::convertStateBackStr(StateType state) {
 	}
     if (seq_type == SEQ_DOUBLET) {
         if (num_states == 7) {
-            static const char* rna7_names[] = {"AU", "UA", "CG", "GC", "GU", "UG", "MM"};
+            static const char* rna7_names[] = {"AU", "CG", "GC", "GU", "UA", "UG", "MM"};
             if (state < 7) return rna7_names[state];
             return "??";
         }
@@ -4013,7 +4013,7 @@ void Alignment::convertDNAToDoublet(Alignment *aln, vector<pair<int,int>> &pairs
 
 // ---------------------------------------------------------------------------
 // convertDoubletToRNA7 — collapse a 16-state doublet alignment into 7 states:
-//   0=AU, 1=UA, 2=CG, 3=GC, 4=GU, 5=UG, 6=MM (all 10 mismatches lumped)
+//   0=AU, 1=CG, 2=GC, 3=GU, 4=UA, 5=UG, 6=MM (RAxML ordering)
 // ---------------------------------------------------------------------------
 
 void Alignment::convertDoubletToRNA7(Alignment *aln) {
@@ -4021,13 +4021,14 @@ void Alignment::convertDoubletToRNA7(Alignment *aln) {
         outError("convertDoubletToRNA7: source must be a 16-state doublet alignment");
 
     // Mapping from 16-state doublet index to RNA7 state index.
-    // Canonical pairs: AU(3)->0, UA(12)->1, CG(6)->2, GC(9)->3, GU(11)->4, UG(14)->5
+    // Uses RAxML state ordering: AU=0, CG=1, GC=2, GU=3, UA=4, UG=5, MM=6
+    // Canonical pairs: AU(3)->0, CG(6)->1, GC(9)->2, GU(11)->3, UA(12)->4, UG(14)->5
     // All non-canonical (mismatches): ->6
     static const int doublet_to_rna7[16] = {
         6, 6, 6, 0,   // AA=6, AC=6, AG=6, AU=0
-        6, 6, 2, 6,   // CA=6, CC=6, CG=2, CU=6
-        6, 3, 6, 4,   // GA=6, GC=3, GG=6, GU=4
-        1, 6, 5, 6    // UA=1, UC=6, UG=5, UU=6
+        6, 6, 1, 6,   // CA=6, CC=6, CG=1, CU=6
+        6, 2, 6, 3,   // GA=6, GC=2, GG=6, GU=3
+        4, 6, 5, 6    // UA=4, UC=6, UG=5, UU=6
     };
 
     // Copy sequence names and metadata from source alignment
