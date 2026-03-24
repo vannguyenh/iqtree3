@@ -1560,7 +1560,7 @@ void reportPhyloAnalysis(Params &params, IQTree &tree, ModelCheckpoint &model_in
                 case SEQ_PROTEIN: out << "AA"; break;
                 case SEQ_POMO: out << "POMO"; break;
                 case SEQ_GENOTYPE: out << "GT"; break;
-                case SEQ_DOUBLET: out << ((*it)->aln->num_states == 7 ? "RNA7" : "RNA16"); break;
+                case SEQ_DOUBLET: out << "RNA"; break;
                 case SEQ_UNKNOWN: out << "???"; break;
                 }
                 out << "\t" << (*it)->aln->getNSeq() << "\t" << (*it)->aln->getNSite()
