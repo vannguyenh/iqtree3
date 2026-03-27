@@ -679,6 +679,14 @@ public:
     void convertDoubletToRNA7(Alignment *aln);
 
     /**
+        Convert a 16-state RNA doublet alignment into a 6-state RNA6 alignment.
+        The 6 canonical pairs (AU, UA, CG, GC, GU, UG) become states 0-5;
+        all 10 mismatch pairs are treated as missing data (STATE_UNKNOWN).
+        @param aln  source doublet alignment (must have seq_type == SEQ_DOUBLET, num_states == 16)
+    */
+    void convertDoubletToRNA6(Alignment *aln);
+
+    /**
         get Codon StateType from input sites
     */
     StateType getCodonStateTypeFromSites(char state, char state2, char state3, string sequence_name, int site_index, ostringstream &err_str, int &num_error);

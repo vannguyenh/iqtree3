@@ -1974,6 +1974,11 @@ string Alignment::convertStateBackStr(StateType state) {
         return str;
 	}
     if (seq_type == SEQ_DOUBLET) {
+        if (num_states == 6) {
+            static const char* rna6_names[] = {"AU", "CG", "GC", "GU", "UA", "UG"};
+            if (state < 6) return rna6_names[state];
+            return "??";
+        }
         if (num_states == 7) {
             static const char* rna7_names[] = {"AU", "CG", "GC", "GU", "UA", "UG", "MM"};
             if (state < 7) return rna7_names[state];
@@ -4060,6 +4065,65 @@ void Alignment::convertDoubletToRNA7(Alignment *aln) {
                 pat[s] = doublet_to_rna7[st];
             else
                 pat[s] = STATE_UNKNOWN;
+        }
+        addPattern(pat, site);
+    }
+
+    verbose_mode = save_mode;
+    countConstSite();
+}
+
+// ---------------------------------------------------------------------------
+// convertDoubletToRNA6 — collapse a 16-state doublet alignment into 6 states:
+//   0=AU, 1=CG, 2=GC, 3=GU, 4=UA, 5=UG  (RAxML ordering)
+//   All mismatch pairs become STATE_UNKNOWN (missing data).
+// ---------------------------------------------------------------------------
+
+void Alignment::convertDoubletToRNA6(Alignment *aln) {
+    if (aln->seq_type != SEQ_DOUBLET || aln->num_states != 16)
+        outError("convertDoubletToRNA6: source must be a 16-state doublet alignment");
+
+    // Mapping from 16-state doublet index to RNA6 state index.
+    // Canonical pairs: AU(3)->0, CG(6)->1, GC(9)->2, GU(11)->3, UA(12)->4, UG(14)->5
+    // All non-canonical (mismatches): -> -1 (will become STATE_UNKNOWN)
+    static const int doublet_to_rna6[16] = {
+       -1, -1, -1,  0,   // AA=-1, AC=-1, AG=-1, AU=0
+       -1, -1,  1, -1,   // CA=-1, CC=-1, CG=1,  CU=-1
+       -1,  2, -1,  3,   // GA=-1, GC=2,  GG=-1, GU=3
+        4, -1,  5, -1    // UA=4,  UC=-1, UG=5,  UU=-1
+    };
+
+    // Copy sequence names and metadata from source alignment
+    for (size_t i = 0; i < aln->getNSeq(); i++)
+        seq_names.push_back(aln->getSeqName(i));
+    name          = aln->name;
+    model_name    = aln->model_name;
+    aln_file      = aln->aln_file;
+    sequence_type = "DOUBLET";
+    seq_type      = SEQ_DOUBLET;
+    num_states    = 6;
+    computeUnknownState();   // sets STATE_UNKNOWN = num_states = 6
+
+    site_pattern.resize(aln->getNSite(), -1);
+    clear();
+    pattern_index.clear();
+
+    size_t nseq = aln->getNSeq();
+    VerboseMode save_mode = verbose_mode;
+    verbose_mode = min(verbose_mode, VB_MIN);
+
+    Pattern pat;
+    pat.resize(nseq);
+    for (size_t site = 0; site < aln->getNSite(); site++) {
+        int ptn_id = aln->getPatternID(site);
+        for (size_t s = 0; s < nseq; s++) {
+            StateType st = aln->at(ptn_id)[s];
+            if (st < 16) {
+                int mapped = doublet_to_rna6[st];
+                pat[s] = (mapped >= 0) ? mapped : STATE_UNKNOWN;
+            } else {
+                pat[s] = STATE_UNKNOWN;
+            }
         }
         addPattern(pat, site);
     }
