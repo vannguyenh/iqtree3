@@ -11,6 +11,10 @@
  *   states and all 10 mismatches are lumped into a single MM state.      *
  *   Naming follows the PHASE/RAxML convention (S7A..S7F).                *
  *                                                                         *
+ *   Also implements RNA6A through RNA6E — 6-state models where only the  *
+ *   6 canonical pairs are modelled and mismatches are treated as missing  *
+ *   data.  Naming follows PHASE/RAxML (S6A..S6E).                        *
+ *                                                                         *
  *   State encoding for RNA16 (0-15):                                      *
  *     0=AA 1=AC 2=AG 3=AU                                                 *
  *     4=CA 5=CC 6=CG 7=CU                                                 *
@@ -19,6 +23,9 @@
  *                                                                         *
  *   State encoding for RNA7 (0-6):                                        *
  *     0=AU 1=CG 2=GC 3=GU 4=UA 5=UG 6=MM  (RAxML ordering)              *
+ *                                                                         *
+ *   State encoding for RNA6 (0-5):                                        *
+ *     0=AU 1=CG 2=GC 3=GU 4=UA 5=UG        (RAxML ordering)              *
  *                                                                         *
  *   Parameter counts (free params):                                       *
  *     RNA16:  119 free rates + 15 free freqs = 134                        *
@@ -30,6 +37,11 @@
  *     RNA7D:    3 free rates +  6 free freqs =   9  (4 rate classes)      *
  *     RNA7E:    1 free rate  +  6 free freqs =   7  (forbidden + 2 cls)   *
  *     RNA7F:    3 free rates +  3 free freqs =   6  (7D + strand-sym)     *
+ *     RNA6A:   14 free rates +  5 free freqs =  19  (full GTR)            *
+ *     RNA6B:    2 free rates +  5 free freqs =   7  (3 rate classes)      *
+ *     RNA6C:    2 free rates +  2 free freqs =   4  (3 cls + strand-sym)  *
+ *     RNA6D:    1 free rate  +  2 free freqs =   3  (forbidden+strand-sym)*
+ *     RNA6E:    1 free rate  +  5 free freqs =   6  (forbidden+indep)     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -64,7 +76,12 @@ public:
         RNA7C,    // 10 rate classes (some forbidden): 9 rates + 6 freqs = 15
         RNA7D,    //  4 rate classes:     3 free rates +  6 free freqs = 9
         RNA7E,    //  2 rate classes (some forbidden): 1 rate  + 6 freqs = 7
-        RNA7F     //  4 rate classes, strand-sym freqs: 3 rates + 3 freqs = 6
+        RNA7F,    //  4 rate classes, strand-sym freqs: 3 rates + 3 freqs = 6
+        RNA6A,    // Full 6-state GTR:   14 free rates +  5 free freqs = 19
+        RNA6B,    //  3 rate classes:     2 free rates +  5 free freqs = 7
+        RNA6C,    //  3 rate classes, strand-sym freqs: 2 rates + 2 freqs = 4
+        RNA6D,    //  2 rate classes (some forbidden), strand-sym: 1 rate + 2 freqs = 3
+        RNA6E     //  2 rate classes (some forbidden): 1 rate + 5 freqs = 6
     };
 
     /**
@@ -126,8 +143,14 @@ private:
     /** @return true if this is an RNA7 family variant. */
     bool isRNA7() const { return variant >= RNA7A && variant <= RNA7F; }
 
+    /** @return true if this is an RNA6 family variant. */
+    bool isRNA6() const { return variant >= RNA6A && variant <= RNA6E; }
+
+    /** @return true if this is a collapsed (non-16-state) variant. */
+    bool isCollapsed() const { return isRNA7() || isRNA6(); }
+
     /** @return true if this is a full GTR variant (all rates free). */
-    bool isFullGTR() const { return variant == RNA16 || variant == RNA7A || variant == RNA7B; }
+    bool isFullGTR() const { return variant == RNA16 || variant == RNA7A || variant == RNA7B || variant == RNA6A; }
 
     // For full GTR variants: maps optimizer slot i (1-based) to rates[] index.
     // Length = num_params.  Forbidden rates are skipped in this mapping.
@@ -135,6 +158,9 @@ private:
 
     // For RNA7 models: maps RNA7 state index (0-6) to representative doublet value.
     static const int rna7_to_doublet[7];
+
+    // For RNA6 models: maps RNA6 state index (0-5) to representative doublet value.
+    static const int rna6_to_doublet[6];
 
     /**
      * Initialise equilibrium frequencies from freq_params or alignment.
@@ -157,6 +183,13 @@ private:
     void getRNA7SymmetrySpec(int *sym_vec, int *freq_group) const;
 
     /**
+     * Get the RAxML-style symmetry vector and frequency grouping for this
+     * RNA6 variant.  Returns the symmetry vector (15 entries) and frequency
+     * grouping (6 entries).
+     */
+    void getRNA6SymmetrySpec(int *sym_vec, int *freq_group) const;
+
+    /**
      * Classify doublet state i:
      *   0 = Watson-Crick pair (AU, UA, GC, CG)
      *   1 = wobble pair (GU, UG)
@@ -166,8 +199,8 @@ private:
 };
 
 /**
- * Return the position of "+RNA16", "+RNA16A", "+RNA16B", "+RNA7A".."+RNA7F"
- * in the model name string, or string::npos if not found.
+ * Return the position of "+RNA16", "+RNA16A", "+RNA16B", "+RNA7A".."+RNA7F",
+ * "+RNA6A".."+RNA6E" in the model name string, or string::npos if not found.
  */
 string::size_type posRNA(const string &model_name);
 

@@ -10,6 +10,13 @@
  *     RNA16A / S16A  — 5 rate classes (4 free rates)                      *
  *     RNA16B / S16B  — equal rates (0 free rates)                         *
  *                                                                         *
+ *   6-state models (collapsed: 6 canonical pairs, mismatches = missing):  *
+ *     RNA6A / S6A  — full GTR (14 free rates, 5 free freqs)              *
+ *     RNA6B / S6B  — 3 rate classes (2+5)                                *
+ *     RNA6C / S6C  — 3 rate classes, strand-sym freqs (2+2)              *
+ *     RNA6D / S6D  — 2 rate classes, some forbidden, strand-sym (1+2)    *
+ *     RNA6E / S6E  — 2 rate classes, some forbidden (1+5)                *
+ *                                                                         *
  *   7-state models (collapsed: 6 canonical pairs + MM):                   *
  *     RNA7A / S7A  — full GTR (20 free rates, 6 free freqs)              *
  *     RNA7B / S7B  — full GTR rates, strand-sym freqs (20+3)             *
@@ -133,6 +140,13 @@ const int ModelRNA::rna7_to_doublet[7] = {3, 6, 9, 11, 12, 14, 0};
 // RAxML ordering: 0=AU(3), 1=CG(6), 2=GC(9), 3=GU(11), 4=UA(12), 5=UG(14), 6=MM(0=AA)
 
 // -----------------------------------------------------------------------
+// RNA6 state-to-doublet mapping
+// -----------------------------------------------------------------------
+
+const int ModelRNA::rna6_to_doublet[6] = {3, 6, 9, 11, 12, 14};
+// RAxML ordering: 0=AU(3), 1=CG(6), 2=GC(9), 3=GU(11), 4=UA(12), 5=UG(14)
+
+// -----------------------------------------------------------------------
 // getRNA7SymmetrySpec
 //
 // Returns the RAxML-style symmetry vector (21 upper-triangle entries for
@@ -236,7 +250,85 @@ void ModelRNA::getRNA7SymmetrySpec(int *sym_vec, int *freq_group) const {
 }
 
 // -----------------------------------------------------------------------
-// posRNA — find "+RNA16", "+RNA16A", "+RNA16B", "+RNA7A".."+RNA7F" in model string
+// getRNA6SymmetrySpec
+//
+// Returns the RAxML-style symmetry vector (15 upper-triangle entries for
+// 6 states) and frequency grouping (6 entries) for the given RNA6 variant.
+//
+// Arrays taken directly from RAxML standard-RAxML/models.c
+// (SEC_6_A through SEC_6_E).
+// -----------------------------------------------------------------------
+
+void ModelRNA::getRNA6SymmetrySpec(int *sym_vec, int *freq_group) const {
+    // Upper-triangle order for 6 states (15 entries):
+    // (0,1) (0,2) (0,3) (0,4) (0,5)
+    // (1,2) (1,3) (1,4) (1,5)
+    // (2,3) (2,4) (2,5)
+    // (3,4) (3,5)
+    // (4,5)
+
+    // Default: all frequencies independent
+    static const int freq_indep[6] = {0, 1, 2, 3, 4, 5};
+    // Strand-symmetric: AU~UA (group 0), GU~UG (group 1), CG~GC (group 2)
+    static const int freq_strand[6] = {0, 2, 2, 1, 0, 1};
+
+    switch (variant) {
+        case RNA6A: {
+            // S6A: Full GTR — all 15 rates independent
+            for (int k = 0; k < 15; k++) sym_vec[k] = k;
+            memcpy(freq_group, freq_indep, 6 * sizeof(int));
+            break;
+        }
+        case RNA6B: {
+            // S6B: 3 rate classes, independent frequencies
+            //   class 0 = complement swap (AU-GC, CG-UA)
+            //   class 1 = single sub WC<->wobble
+            //   class 2 = other canonical double subs (reference)
+            static const int s[] = {2, 0, 1, 2, 2,
+                                    2, 2, 0, 1, 1,
+                                    2, 2, 2, 2, 1};
+            memcpy(sym_vec, s, 15 * sizeof(int));
+            memcpy(freq_group, freq_indep, 6 * sizeof(int));
+            break;
+        }
+        case RNA6C: {
+            // S6C: 3 rate classes (same as S6B), strand-symmetric frequencies
+            static const int s[] = {2, 0, 1, 2, 2,
+                                    2, 2, 0, 1, 1,
+                                    2, 2, 2, 2, 1};
+            memcpy(sym_vec, s, 15 * sizeof(int));
+            memcpy(freq_group, freq_strand, 6 * sizeof(int));
+            break;
+        }
+        case RNA6D: {
+            // S6D: 2 rate classes + forbidden, strand-symmetric frequencies
+            //   complement swaps (AU-GC, CG-UA) are forbidden
+            static const int s[] = {2, -1, 1, 2, 2,
+                                    2,  2, -1, 1, 1,
+                                    2,  2, 2, 2, 1};
+            memcpy(sym_vec, s, 15 * sizeof(int));
+            memcpy(freq_group, freq_strand, 6 * sizeof(int));
+            break;
+        }
+        case RNA6E: {
+            // S6E: 2 rate classes + forbidden, independent frequencies
+            //   complement swaps (AU-GC, CG-UA) are forbidden
+            static const int s[] = {2, -1, 1, 2, 2,
+                                    2,  2, -1, 1, 1,
+                                    2,  2, 2, 2, 1};
+            memcpy(sym_vec, s, 15 * sizeof(int));
+            memcpy(freq_group, freq_indep, 6 * sizeof(int));
+            break;
+        }
+        default:
+            ASSERT(0 && "getRNA6SymmetrySpec called for non-RNA6 variant");
+            break;
+    }
+}
+
+// -----------------------------------------------------------------------
+// posRNA — find "+RNA16", "+RNA16A", "+RNA16B", "+RNA7A".."+RNA7F",
+//          "+RNA6A".."+RNA6E" in model string
 // -----------------------------------------------------------------------
 
 string::size_type posRNA(const string &model_name) {
@@ -247,6 +339,9 @@ string::size_type posRNA(const string &model_name) {
         "+RNA7A",  "*RNA7A",  "+RNA7B",  "*RNA7B",
         "+RNA7C",  "*RNA7C",  "+RNA7D",  "*RNA7D",
         "+RNA7E",  "*RNA7E",  "+RNA7F",  "*RNA7F",
+        "+RNA6A",  "*RNA6A",  "+RNA6B",  "*RNA6B",
+        "+RNA6C",  "*RNA6C",  "+RNA6D",  "*RNA6D",
+        "+RNA6E",  "*RNA6E",
         nullptr
     };
     string::size_type best = string::npos;
@@ -295,7 +390,7 @@ void ModelRNA::applySymmetryVector() {
     int nrates = n * (n - 1) / 2;
 
     if (isFullGTR()) {
-        // Full GTR (RNA16, RNA7A, RNA7B).  All upper-triangle exchangeabilities
+        // Full GTR (RNA16, RNA7A, RNA7B, RNA6A).  All upper-triangle exchangeabilities
         // are free except the last one, which is the reference fixed at 1.0.
         //
         // ModelMarkov::setReversible() already set num_params = nrates-1 and
@@ -315,24 +410,33 @@ void ModelRNA::applySymmetryVector() {
     // delegate to setRateType().  RNA16 has at most 5 classes (0-4), well
     // within the single-digit encoding limit.
     //
-    // For RNA7 variants (RNA7C..RNA7F): directly build param_spec, param_fixed,
+    // For RNA7/RNA6 variants: directly build param_spec, param_fixed,
     // and num_params from the symmetry vector.  This avoids the single-digit
     // encoding of setRateType() which cannot distinguish forbidden sentinel '9'
     // from rate class 9 when a model has 10 rate classes (e.g. RNA7C).
 
-    bool is7 = isRNA7();
+    bool isCollapsedModel = isRNA7() || isRNA6();
 
-    if (is7) {
-        // --- RNA7 constrained models: direct param_spec construction ---
-        int sym_vec[21], freq_group[7];
-        getRNA7SymmetrySpec(sym_vec, freq_group);
+    if (isCollapsedModel) {
+        // --- RNA7/RNA6 constrained models: direct param_spec construction ---
+        int sym_vec_buf[21];   // max needed: 21 for RNA7, 15 for RNA6
+        int freq_group_buf[7]; // max needed: 7 for RNA7, 6 for RNA6
+        int nrates_collapsed = num_states * (num_states - 1) / 2;
+
+        if (isRNA7())
+            getRNA7SymmetrySpec(sym_vec_buf, freq_group_buf);
+        else
+            getRNA6SymmetrySpec(sym_vec_buf, freq_group_buf);
+
+        int *sym_vec = sym_vec_buf;
+        int *freq_group = freq_group_buf;
 
         // Find the reference class (highest-numbered non-forbidden class).
         // This class will be fixed at rate 1.0.
         int ref_class = -1;
-        for (int k = 0; k < 21; k++)
+        for (int k = 0; k < nrates_collapsed; k++)
             if (sym_vec[k] > ref_class) ref_class = sym_vec[k];
-        ASSERT(ref_class >= 0 && "RNA7 symmetry vector has no valid rate classes");
+        ASSERT(ref_class >= 0 && "RNA7/RNA6 symmetry vector has no valid rate classes");
 
         // Assign param IDs:
         //   ref_class → ID 0 (reference, fixed at 1.0)
@@ -345,7 +449,7 @@ void ModelRNA::applySymmetryVector() {
         //   param_fixed[forbidden_id] = true  (if forbidden entries exist)
 
         bool has_forbidden = false;
-        for (int k = 0; k < 21 && !has_forbidden; k++)
+        for (int k = 0; k < nrates_collapsed && !has_forbidden; k++)
             if (sym_vec[k] == -1) has_forbidden = true;
 
         int forbidden_param_id = has_forbidden ? (ref_class + 1) : -1;
@@ -353,7 +457,7 @@ void ModelRNA::applySymmetryVector() {
 
         // Build param_spec: map each rate entry to its param ID
         param_spec.clear();
-        for (int k = 0; k < 21; k++) {
+        for (int k = 0; k < nrates_collapsed; k++) {
             int cls = sym_vec[k];
             int id;
             if (cls == -1)
@@ -381,7 +485,7 @@ void ModelRNA::applySymmetryVector() {
         // Average rates within each param group and normalize by reference
         vector<double> avg_rates(total_ids, 0.0);
         vector<int> num_rates_per_id(total_ids, 0);
-        for (int k = 0; k < 21; k++) {
+        for (int k = 0; k < nrates_collapsed; k++) {
             int id = (unsigned char)param_spec[k];
             avg_rates[id] += rates[k];
             num_rates_per_id[id]++;
@@ -391,7 +495,7 @@ void ModelRNA::applySymmetryVector() {
                 avg_rates[i] /= num_rates_per_id[i];
         // Normalize so reference class = 1.0
         double ref_rate = avg_rates[0];
-        for (int k = 0; k < 21; k++) {
+        for (int k = 0; k < nrates_collapsed; k++) {
             int id = (unsigned char)param_spec[k];
             if (ref_rate > 0.0)
                 rates[k] = avg_rates[id] / ref_rate;
@@ -400,7 +504,7 @@ void ModelRNA::applySymmetryVector() {
         }
 
         // Force forbidden rates to 0.0
-        for (int k = 0; k < 21; k++)
+        for (int k = 0; k < nrates_collapsed; k++)
             if (sym_vec[k] == -1)
                 rates[k] = 0.0;
     } else {
@@ -533,6 +637,21 @@ void ModelRNA::init(const char *model_name, string model_params,
     } else if (mname == "RNA7F") {
         variant = RNA7F;
         rna_model_name = "RNA7F";
+    } else if (mname == "RNA6A") {
+        variant = RNA6A;
+        rna_model_name = "RNA6A";
+    } else if (mname == "RNA6B") {
+        variant = RNA6B;
+        rna_model_name = "RNA6B";
+    } else if (mname == "RNA6C") {
+        variant = RNA6C;
+        rna_model_name = "RNA6C";
+    } else if (mname == "RNA6D") {
+        variant = RNA6D;
+        rna_model_name = "RNA6D";
+    } else if (mname == "RNA6E") {
+        variant = RNA6E;
+        rna_model_name = "RNA6E";
     } else {
         // default: RNA16 (also accepts bare "RNA16")
         variant = RNA16;
@@ -541,12 +660,13 @@ void ModelRNA::init(const char *model_name, string model_params,
 
     this->freq_type = freq_type;
 
-    // For strand-symmetric RNA7 variants (RNA7B, RNA7F), frequencies are
-    // constrained by grouping, not individually estimated.  Override
+    // For strand-symmetric variants (RNA7B, RNA7F, RNA6C, RNA6D), frequencies
+    // are constrained by grouping, not individually estimated.  Override
     // FREQ_ESTIMATE to FREQ_EMPIRICAL so the optimizer doesn't break the
     // strand symmetry.  The grouping constraint is enforced in
     // initDoubletFrequencies().
-    if ((variant == RNA7B || variant == RNA7F) && freq_type == FREQ_ESTIMATE)
+    if ((variant == RNA7B || variant == RNA7F ||
+         variant == RNA6C || variant == RNA6D) && freq_type == FREQ_ESTIMATE)
         this->freq_type = FREQ_EMPIRICAL;
 
     // ModelMarkov::setReversible (called in ModelMarkov constructor) already
@@ -637,22 +757,28 @@ void ModelRNA::initDoubletFrequencies(string freq_params) {
             for (int i = 0; i < num_states; i++) state_freq[i] /= sum;
         }
     }
-    // For strand-symmetric RNA7 models (RNA7B, RNA7F): enforce frequency
-    // grouping.  States with the same group index share one frequency value.
-    // Grouping: {0,2,2,1,0,1,3} means AU(0)~GU(4), UA(1)~UG(5), CG(2)~GC(3).
-    if (variant == RNA7B || variant == RNA7F) {
-        int freq_group[7];
+    // For strand-symmetric models: enforce frequency grouping.
+    // States with the same group index share one frequency value.
+    // RNA7: {0,2,2,1,0,1,3} means AU(0)~UA(4), CG(1)~GC(2), GU(3)~UG(5).
+    // RNA6: {0,2,2,1,0,1}   means AU(0)~UA(4), CG(1)~GC(2), GU(3)~UG(5).
+    if (variant == RNA7B || variant == RNA7F ||
+        variant == RNA6C || variant == RNA6D) {
+        int freq_group[7];   // max 7 entries
         int sym_vec_dummy[21];
-        getRNA7SymmetrySpec(sym_vec_dummy, freq_group);
+        if (isRNA7())
+            getRNA7SymmetrySpec(sym_vec_dummy, freq_group);
+        else
+            getRNA6SymmetrySpec(sym_vec_dummy, freq_group);
+        int ns = num_states;
         // Find max group id
         int max_group = 0;
-        for (int i = 0; i < 7; i++)
+        for (int i = 0; i < ns; i++)
             if (freq_group[i] > max_group) max_group = freq_group[i];
         // Average frequencies within each group
         for (int g = 0; g <= max_group; g++) {
             double avg = 0.0;
             int count = 0;
-            for (int i = 0; i < 7; i++) {
+            for (int i = 0; i < ns; i++) {
                 if (freq_group[i] == g) {
                     avg += state_freq[i];
                     count++;
@@ -660,15 +786,15 @@ void ModelRNA::initDoubletFrequencies(string freq_params) {
             }
             if (count > 0) {
                 avg /= count;
-                for (int i = 0; i < 7; i++)
+                for (int i = 0; i < ns; i++)
                     if (freq_group[i] == g)
                         state_freq[i] = avg;
             }
         }
         // Renormalize after grouping
         double sum = 0.0;
-        for (int i = 0; i < 7; i++) sum += state_freq[i];
-        for (int i = 0; i < 7; i++) state_freq[i] /= sum;
+        for (int i = 0; i < ns; i++) sum += state_freq[i];
+        for (int i = 0; i < ns; i++) state_freq[i] /= sum;
     }
     ModelMarkov::setStateFrequency(state_freq);
 }
@@ -721,8 +847,8 @@ void ModelRNA::restoreCheckpoint() {
     int n = num_states;
     int nrates = n * (n - 1) / 2;
 
-    if (isRNA7() && !isFullGTR()) {
-        // For RNA7 constrained models (RNA7C..RNA7F), bypass
+    if (isCollapsed() && !isFullGTR()) {
+        // For RNA7/RNA6 constrained models, bypass
         // ModelDNA::restoreCheckpoint() because it calls setRateType()
         // which cannot handle param_spec IDs > 9.  Instead, restore
         // the Markov-level data directly and rebuild param_spec ourselves.
@@ -734,8 +860,8 @@ void ModelRNA::restoreCheckpoint() {
         // Rebuild param_spec, param_fixed, num_params from symmetry vector
         applySymmetryVector();
     } else {
-        // RNA16 variants and full-GTR RNA7 (RNA7A, RNA7B): safe to use
-        // ModelDNA::restoreCheckpoint() which calls setRateType() internally.
+        // RNA16 variants and full-GTR RNA7/RNA6 (RNA7A, RNA7B, RNA6A): safe
+        // to use ModelDNA::restoreCheckpoint() which calls setRateType().
         ModelDNA::restoreCheckpoint();
         startCheckpoint();
         CKP_ARRAY_RESTORE(nrates, rates);
