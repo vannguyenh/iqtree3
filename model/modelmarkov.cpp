@@ -468,6 +468,17 @@ void ModelMarkov::report_state_freqs(ostream& out, double *custom_state_freq) {
             out << "  " << bases[i>>2] << bases[i&3] << ": " << f[i];
             if (i % 4 == 3) out << endl;
         }
+    } else if (num_states == 6 && phylo_tree && phylo_tree->aln &&
+               phylo_tree->aln->seq_type == SEQ_DOUBLET) {
+        // RNA 6-state collapsed doublet model
+        static const char* rna6_names[] = {"AU", "CG", "GC", "GU", "UA", "UG"};
+        out << setprecision(4);
+        out << "RNA6 state frequencies:" << endl;
+        for (int i = 0; i < 6; i++) {
+            out << "  " << rna6_names[i] << ": " << f[i];
+            if ((i + 1) % 3 == 0) out << endl;
+        }
+        out << endl;
     } else if (num_states == 7 && phylo_tree && phylo_tree->aln &&
                phylo_tree->aln->seq_type == SEQ_DOUBLET) {
         // RNA 7-state collapsed doublet model
