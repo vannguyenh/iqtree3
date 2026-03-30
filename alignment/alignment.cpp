@@ -2335,7 +2335,6 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
             throw "Counts Format pattern is built in Alignment::readCountsFormat().";
             break;
         case SEQ_GENOTYPE:
-            // TODO: genotype num_state
             if (params.model_name.find("GT10") != string::npos) {
                 num_states = 10;
             } else if (params.model_name.find("GT16") != string::npos) {
