@@ -194,7 +194,6 @@ void inferInputParameters(Params &params, Checkpoint *checkpoint, IQTree *&tree,
         else
         {
             params.alisim_sequence_length = (tree->aln->seq_type == SEQ_CODON) ? (tree->aln->getNSite() * 3) :
-                                            (tree->aln->seq_type == SEQ_GENOTYPE) ? (tree->aln->getNSite() * 2) :
                                             tree->aln->getNSite();
         }
     }
@@ -210,7 +209,7 @@ int computeTotalSequenceLengthAllPartitions(PhyloSuperTree *super_tree)
     for (int i = 0; i < super_tree->size(); i++)
     {
         Alignment *aln = super_tree->at(i)->aln;
-        total_length += ( (aln->seq_type == SEQ_CODON) ? (aln->getNSite() * 3) : (aln->seq_type == SEQ_GENOTYPE) ? (aln->getNSite() * 2) : aln->getNSite());
+        total_length += ( (aln->seq_type == SEQ_CODON) ? (aln->getNSite() * 3) : aln->getNSite());
     }
     return total_length;
 }
@@ -637,9 +636,9 @@ void retrieveAncestralSequenceFromInputFile(AliSimulator *super_alisimulator, ve
     int max_num_states = src_tree->aln->getMaxNumStates();
     
     // convert the input sequence into (numerical states) sequence
-    int num_sites_per_state = (src_tree->aln->seq_type == SEQ_CODON) ? 3 : (src_tree->aln->seq_type == SEQ_GENOTYPE) ? 2 : 1;
+    int num_sites_per_state = (src_tree->aln->seq_type == SEQ_CODON) ? 3 : 1;
     int sequence_length = (src_tree->aln->seq_type == SEQ_CODON) ? (super_alisimulator->params->alisim_sequence_length / 3)
-        : (src_tree->aln->seq_type == SEQ_GENOTYPE) ? (super_alisimulator->params->alisim_sequence_length / 2) : super_alisimulator->params->alisim_sequence_length;
+        : super_alisimulator->params->alisim_sequence_length;
 
     // make sure the length of the ancestral sequence must be equal to the total length of all partitions
     if (super_alisimulator->tree->isSuperTree() && sequence_length != super_alisimulator->tree->getAlnNSite())
@@ -741,7 +740,7 @@ void addMutations2Tree(const std::vector<std::pair<std::string, std::string>>& n
 
     // create a mapping between each node name and a pair of pointers <dad_node, node>
     std::map<std::string, std::pair<Node*, Node*>> node_mapping;
-    createNodeMapping(node_mapping, tree->root, NULL);
+    createNodeMapping(node_mapping, tree->root, nullptr);
 
     // browse the list of node_mutations to add mutations of each node to the corresponding node in the tree
     for (const std::pair<std::string, std::string>& mutations : node_mutations)
@@ -905,7 +904,7 @@ void generateMultipleAlignmentsFromSingleTree(AliSimulator *super_alisimulator, 
             site_locked_vec = new std::vector<bool>(super_alisimulator->expected_num_sites, false);
 
             // browse the tree to mark all locked sites
-            getLockedSites(super_alisimulator->tree->root, NULL, site_locked_vec, super_alisimulator->tree->aln);
+            getLockedSites(super_alisimulator->tree->root, nullptr, site_locked_vec, super_alisimulator->tree->aln);
         }
     }
 
@@ -972,8 +971,7 @@ void generateMultipleAlignmentsFromSingleTree(AliSimulator *super_alisimulator, 
                 // get variables
                 IQTree *current_tree = (IQTree*) super_tree->at(partition_index);
                 int expected_num_states_current_tree = current_tree->aln->getNSite();
-                int num_sites_per_state = (super_tree->at(partition_index)->aln->seq_type == SEQ_CODON) ? 3
-                                            : (super_tree->at(partition_index)->aln->seq_type == SEQ_GENOTYPE) ? 2 :1;
+                int num_sites_per_state = (super_tree->at(partition_index)->aln->seq_type == SEQ_CODON) ? 3 : 1;
                 
                 // create position_spec in case aln_files are specified in a directory
                 if (super_alisimulator->params->partition_file && isDirectory(super_alisimulator->params->partition_file))
@@ -1288,7 +1286,7 @@ void writeSequencesToFile(string file_path, Alignment *aln, int sequence_length,
 {
     try {
             // init output_stream for Indels to output aln without gaps
-            ostream *out_indels = NULL;
+            ostream *out_indels = nullptr;
             bool write_indels_output = false;
             if (alisimulator->params->alisim_insertion_ratio + alisimulator->params->alisim_deletion_ratio > 0
                 && !alisimulator->params->alisim_no_export_sequence_wo_gaps)
@@ -1310,8 +1308,7 @@ void writeSequencesToFile(string file_path, Alignment *aln, int sequence_length,
             out->exceptions(ios::failbit | ios::badbit);
 
             // write the first line <#taxa> <length_of_sequence> (for PHYLIP output format)
-            int seq_length_times_num_sites_per_state = (aln->seq_type == SEQ_CODON ? (sequence_length * 3)
-                                                    : aln->seq_type == SEQ_GENOTYPE ? (sequence_length*2 ): sequence_length);
+            int seq_length_times_num_sites_per_state = (aln->seq_type == SEQ_CODON ? (sequence_length * 3): sequence_length);
             string first_line = "";
             uint64_t start_pos = 0;
             if (alisimulator->params->aln_output_format == IN_PHYLIP)
@@ -1560,7 +1557,7 @@ void writeASequenceToFile(Alignment *aln, int sequence_length, int num_threads, 
         #pragma omp task firstprivate(node, num_threads, keep_seq_order) shared(out, out_indels, state_mapping)
         #endif
         {
-            int num_sites_per_state = aln->seq_type == SEQ_CODON?3:aln->seq_type == SEQ_GENOTYPE?2:1;
+            int num_sites_per_state = aln->seq_type == SEQ_CODON ? 3 : 1;
             // initialize the output sequence with all gaps (to handle the cases with missing taxa in partitions)
             string pre_output = AliSimulator::exportPreOutputString(node, output_format, max_length_taxa_name);
             string output(aln->seq_type == SEQ_CODON ? (3 * sequence_length) : sequence_length, '-');
@@ -1758,13 +1755,11 @@ void writeSeqsFromTmpDataAndGenomeTreesIndels(AliSimulator* alisimulator, int se
     in.open((Params::getInstance().alisim_output_filename + "_" + Params::getInstance().tmp_data_filename + "_" + convertIntToString(MPIHelper::getInstance().getProcessID())).c_str());
     
     // dummy variables
-    GenomeTree* genome_tree = NULL;
-    Insertion* previous_insertion = NULL;
-    int num_sites_per_state = alisimulator->tree->aln->seq_type == SEQ_CODON ? 3 :
-                                alisimulator->tree->aln->seq_type == SEQ_GENOTYPE ? 2 : 1;
+    GenomeTree* genome_tree = nullptr;
+    Insertion* previous_insertion = nullptr;
+    int num_sites_per_state = alisimulator->tree->aln->seq_type == SEQ_CODON ? 3 : 1;
 
-    int seq_length_times_num_sites_per_state = alisimulator->tree->aln->seq_type == SEQ_CODON ? (sequence_length * 3) :
-                                alisimulator->tree->aln->seq_type == SEQ_GENOTYPE ? (sequence_length * 2) : sequence_length;
+    int seq_length_times_num_sites_per_state = alisimulator->tree->aln->seq_type == SEQ_CODON ? (sequence_length * 3) : sequence_length;
     int rebuild_indel_his_step = alisimulator->params->rebuild_indel_history_param * alisimulator->tree->leafNum;
     int rebuild_indel_his_thresh = rebuild_indel_his_step;
 
@@ -1798,7 +1793,7 @@ void writeSeqsFromTmpDataAndGenomeTreesIndels(AliSimulator* alisimulator, int se
         string pre_output = AliSimulator::exportPreOutputString(node, output_format, max_length_taxa_name);
         string output(seq_length_times_num_sites_per_state, '-');
         
-        // build a new genome tree from the list of insertions if the genome tree has not been initialized (~NULL)
+        // build a new genome tree from the list of insertions if the genome tree has not been initialized (~nullptr)
         if (!genome_tree)
         {
             genome_tree = new GenomeTree();
@@ -1847,7 +1842,7 @@ void writeSeqsFromTmpDataAndGenomeTreesIndels(AliSimulator* alisimulator, int se
         previous_insertion = node->sequence->insertion_pos;
         
         // delete the insertion_pos of this node as we updated its sequence.
-        node->sequence->insertion_pos = NULL;
+        node->sequence->insertion_pos = nullptr;
         
         // export sequence of a leaf node from original sequence and genome_tree if using Indels
         genome_tree->exportReadableCharacters(seq_ori, num_sites_per_state, state_mapping, output);
