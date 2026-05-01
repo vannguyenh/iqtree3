@@ -34,6 +34,8 @@
 #include <sstream>
 #include <cmath>
 #include <algorithm>
+#include <set>
+#include <map>
 
 // -----------------------------------------------------------------------
 // Pair-type helpers
@@ -145,6 +147,10 @@ const int ModelRNA::rna7_to_doublet[7] = {3, 6, 9, 11, 12, 14, 0};
 
 const int ModelRNA::rna6_to_doublet[6] = {3, 6, 9, 11, 12, 14};
 // RAxML ordering: 0=AU(3), 1=CG(6), 2=GC(9), 3=GU(11), 4=UA(12), 5=UG(14)
+
+// The 10 mismatch doublet indices (all non-canonical pairs)
+static const int mismatch_doublets[10] = {0, 1, 2, 4, 5, 7, 8, 10, 13, 15};
+// AA=0, AC=1, AG=2, CA=4, CC=5, CU=7, GA=8, GG=10, UC=13, UU=15
 
 // -----------------------------------------------------------------------
 // getRNA7SymmetrySpec
@@ -438,22 +444,36 @@ void ModelRNA::applySymmetryVector() {
             if (sym_vec[k] > ref_class) ref_class = sym_vec[k];
         ASSERT(ref_class >= 0 && "RNA7/RNA6 symmetry vector has no valid rate classes");
 
-        // Assign param IDs:
-        //   ref_class → ID 0 (reference, fixed at 1.0)
-        //   forbidden (-1) → ID (ref_class+1), a separate fixed ID with rate 0.0
-        //   other classes → IDs 1..ref_class, ordered by class number
+        // Assign param IDs using contiguous numbering:
+        //   ID 0 = reference class (fixed at 1.0)
+        //   IDs 1..N = other non-forbidden classes, in order of class number
+        //   ID N+1 = forbidden (if any, fixed at 0.0)
         //
-        // For a model with classes 0..ref_class and some forbidden entries:
-        //   num_params = ref_class (number of free rate parameters)
-        //   param_fixed[0] = true  (reference)
-        //   param_fixed[forbidden_id] = true  (if forbidden entries exist)
+        // We first collect the distinct non-reference, non-forbidden classes,
+        // then assign contiguous IDs. This avoids gaps when classes are not
+        // contiguous (e.g. RNA6D has classes {1,2} but not 0).
 
         bool has_forbidden = false;
-        for (int k = 0; k < nrates_collapsed && !has_forbidden; k++)
-            if (sym_vec[k] == -1) has_forbidden = true;
+        set<int> free_classes;
+        for (int k = 0; k < nrates_collapsed; k++) {
+            if (sym_vec[k] == -1)
+                has_forbidden = true;
+            else if (sym_vec[k] != ref_class)
+                free_classes.insert(sym_vec[k]);
+        }
 
-        int forbidden_param_id = has_forbidden ? (ref_class + 1) : -1;
-        int total_ids = has_forbidden ? (ref_class + 2) : (ref_class + 1);
+        // Build mapping: class number → param ID
+        map<int,int> cls_to_id;
+        cls_to_id[ref_class] = 0;  // reference = ID 0
+        int next_id = 1;
+        for (int cls : free_classes)
+            cls_to_id[cls] = next_id++;
+
+        int forbidden_param_id = -1;
+        if (has_forbidden) {
+            forbidden_param_id = next_id++;
+        }
+        int total_ids = next_id;
 
         // Build param_spec: map each rate entry to its param ID
         param_spec.clear();
@@ -462,12 +482,8 @@ void ModelRNA::applySymmetryVector() {
             int id;
             if (cls == -1)
                 id = forbidden_param_id;
-            else if (cls == ref_class)
-                id = 0;
-            else if (cls < ref_class)
-                id = cls + 1;  // classes 0..ref_class-1 map to IDs 1..ref_class
             else
-                id = cls;      // shouldn't happen, but be safe
+                id = cls_to_id[cls];
             param_spec.push_back((char)id);
         }
 
@@ -669,6 +685,154 @@ void ModelRNA::init(const char *model_name, string model_params,
          variant == RNA6C || variant == RNA6D) && freq_type == FREQ_ESTIMATE)
         this->freq_type = FREQ_EMPIRICAL;
 
+    // ---------------------------------------------------------------
+    // Expanded mode: RNA7/RNA6 model on a 16-state doublet alignment.
+    // This happens during model selection (ModelFinder) when all 14
+    // RNA models are tested on the same 16-state alignment.
+    //
+    // Strategy (Douglas's ambiguity coding approach):
+    //   1. Temporarily set num_states to native size (7 or 6)
+    //   2. Build native model (rates, frequencies, symmetry)
+    //   3. Expand to 16x16 via expandToDoubletSpace()
+    //   4. Restore num_states = 16 and install expanded arrays
+    //   5. Enable expanded_mode for computeTipLikelihood()
+    // ---------------------------------------------------------------
+    if (isCollapsed() && num_states == 16) {
+        int native_states = isRNA7() ? 7 : 6;
+        int native_nrates = native_states * (native_states - 1) / 2;
+
+        // Expanded mode for model selection (no user-visible output)
+
+        // Step 1: build rates in native space (don't change num_states yet)
+        // Allocate temporary native-sized arrays
+        double *native_rates = new double[native_nrates];
+        for (int i = 0; i < native_nrates; i++)
+            native_rates[i] = 1.0;
+
+        // Parse user-supplied rate parameters if any
+        if (!model_params.empty()) {
+            istringstream iss(model_params);
+            string tok;
+            vector<double> vals;
+            while (getline(iss, tok, ','))
+                if (!tok.empty()) vals.push_back(stod(tok));
+            int n = min((int)vals.size(), native_nrates - 1);
+            for (int i = 0; i < n; i++)
+                native_rates[i] = max(vals[i], MIN_RATE);
+        }
+
+        // Step 2: temporarily switch to native space for symmetry + frequencies
+        int saved_num_states = num_states;
+        num_states = native_states;
+
+        // Save the 16-state rates pointer and install native rates
+        double *saved_rates = rates;
+        rates = native_rates;
+        num_params = native_nrates - 1;
+
+        // Apply symmetry vector in native space
+        applySymmetryVector();
+
+        // symmetry applied
+
+        // Compute native frequencies from the 16-state alignment by
+        // mapping each doublet state to its native state.
+        // This mirrors what computeStateFreq() would do on a native
+        // alignment, but using the 16-state data directly.
+        double *native_freqs = new double[native_states];
+        for (int i = 0; i < native_states; i++)
+            native_freqs[i] = 0.0;
+
+        // Get 16-state empirical frequencies from the alignment
+        double doublet_freqs[16];
+        phylo_tree->aln->computeStateFreq(doublet_freqs);
+
+        // Map 16-state frequencies to native states
+        const int *nat_to_dbl = isRNA7() ? rna7_to_doublet : rna6_to_doublet;
+        int d2n[16];
+        buildDoubletToNativeMap(nat_to_dbl, native_states, d2n);
+        for (int d = 0; d < 16; d++) {
+            int ns_idx = d2n[d];
+            if (ns_idx >= 0 && ns_idx < native_states)
+                native_freqs[ns_idx] += doublet_freqs[d];
+        }
+
+        // Normalize and clamp near-zero frequencies
+        {
+            double sum = 0.0;
+            for (int i = 0; i < native_states; i++) {
+                if (native_freqs[i] < 0.001)
+                    native_freqs[i] = 0.001;
+                sum += native_freqs[i];
+            }
+            for (int i = 0; i < native_states; i++)
+                native_freqs[i] /= sum;
+        }
+
+        // Save and install native state_freq
+        double *saved_state_freq = state_freq;
+        state_freq = native_freqs;
+
+        // native model ready, expanding
+
+        // Step 3: expand to 16-state doublet space
+        double expanded_rates[120];
+        double expanded_freqs[16];
+        expandToDoubletSpace(expanded_rates, expanded_freqs);
+
+        // expansion done
+
+        // Step 4: restore num_states = 16 and install expanded arrays
+        num_states = saved_num_states;  // back to 16
+
+        // Free native arrays and restore/replace with expanded
+        delete[] native_rates;
+        rates = saved_rates;  // restore original 16-state rates pointer
+        memcpy(rates, expanded_rates, 120 * sizeof(double));
+
+        delete[] native_freqs;
+        state_freq = saved_state_freq;  // restore original 16-state state_freq pointer
+        memcpy(state_freq, expanded_freqs, 16 * sizeof(double));
+
+        // Clear param_spec — expanded model has no rate constraints
+        // (the constraints are baked into the expanded rate values)
+        param_spec.clear();
+        param_fixed.clear();
+
+        // num_params = native value for correct AIC/BIC
+        // (already set by applySymmetryVector in native space)
+        int saved_num_params = num_params;
+
+        // Initialise ModelMarkov in 16-state space (eigenvalue arrays)
+        ModelMarkov::init(this->freq_type);
+        num_params = saved_num_params;
+
+        ModelMarkov::setStateFrequency(state_freq);
+
+        // ModelMarkov init done
+
+        // Step 5: store native param counts for correct AIC/BIC
+        // (getNDim() returns rate params, getNDimFreq() returns freq params)
+        native_num_rate_params = saved_num_params;
+        if (variant == RNA7B || variant == RNA7F)
+            native_num_freq_params = 3;  // 4 groups - 1
+        else if (variant == RNA6C || variant == RNA6D)
+            native_num_freq_params = 2;  // 3 groups - 1
+        else if (isRNA7())
+            native_num_freq_params = native_states - 1;  // 6
+        else
+            native_num_freq_params = native_states - 1;  // 5
+
+        // Step 6: enable expanded mode for computeTipLikelihood()
+        expanded_mode = true;
+
+        return;
+    }
+
+    // ---------------------------------------------------------------
+    // Normal mode: model runs in its native state space.
+    // ---------------------------------------------------------------
+
     // ModelMarkov::setReversible (called in ModelMarkov constructor) already
     // allocated rates[120] = all 1.0 and set num_params = 119.
     // For constrained models, applySymmetryVector() will override this.
@@ -804,12 +968,68 @@ void ModelRNA::initDoubletFrequencies(string freq_params) {
 // -----------------------------------------------------------------------
 
 void ModelRNA::computeTipLikelihood(PML::StateType state, double *state_lk) {
-    if ((int)state < num_states) {
-        memset(state_lk, 0, num_states * sizeof(double));
-        state_lk[state] = 1.0;
-    } else {
-        ModelMarkov::computeTipLikelihood(state, state_lk);
+    if (!expanded_mode) {
+        // --- Normal mode: native state space (16, 7, or 6 states) ---
+        if ((int)state < num_states) {
+            memset(state_lk, 0, num_states * sizeof(double));
+            state_lk[state] = 1.0;
+        } else {
+            ModelMarkov::computeTipLikelihood(state, state_lk);
+        }
+        return;
     }
+
+    // --- Expanded mode: model selection in 16-state doublet space ---
+    // num_states is 16 (the expanded space).
+    // The observed state is a doublet index (0-15).
+
+    if ((int)state >= 16) {
+        // Unknown / gap: all states equally likely
+        for (int i = 0; i < 16; i++)
+            state_lk[i] = 1.0;
+        return;
+    }
+
+    if (isCanonical(state)) {
+        // Canonical pair (AU, CG, GC, GU, UA, UG): unambiguous in all models
+        memset(state_lk, 0, 16 * sizeof(double));
+        state_lk[state] = 1.0;
+    } else if (isRNA7()) {
+        // RNA7 expanded: mismatch doublet -> ambiguous over all 10 mismatches
+        // (the observation tells us it's MM, but not which mismatch)
+        memset(state_lk, 0, 16 * sizeof(double));
+        for (int k = 0; k < 10; k++)
+            state_lk[mismatch_doublets[k]] = 1.0;
+    } else if (isRNA6()) {
+        // RNA6 expanded: mismatch doublet -> completely uninformative (gap)
+        // (RNA6 has no mismatch state at all)
+        for (int i = 0; i < 16; i++)
+            state_lk[i] = 1.0;
+    }
+}
+
+// -----------------------------------------------------------------------
+// getNDim — correct parameter count for AIC/BIC
+// -----------------------------------------------------------------------
+
+int ModelRNA::getNDim() {
+    if (expanded_mode)
+        return native_num_rate_params;
+    return ModelDNA::getNDim();
+}
+
+int ModelRNA::getNDimFreq() {
+    if (expanded_mode)
+        return native_num_freq_params;
+
+    // Normal mode: strand-symmetric variants have fewer free freqs
+    // than num_states-1 because some frequencies are constrained equal.
+    if (variant == RNA7B || variant == RNA7F)
+        return 3;  // 4 groups - 1 (AU=UA, CG=GC, GU=UG, MM)
+    if (variant == RNA6C || variant == RNA6D)
+        return 2;  // 3 groups - 1 (AU=UA, CG=GC, GU=UG)
+
+    return ModelDNA::getNDimFreq();
 }
 
 // -----------------------------------------------------------------------
@@ -832,7 +1052,10 @@ string ModelRNA::getNameParams(bool show_fixed_params) {
 // -----------------------------------------------------------------------
 
 void ModelRNA::startCheckpoint() {
-    checkpoint->startStruct("ModelRNA");
+    // Use model-specific checkpoint key to avoid collisions during model
+    // selection, where RNA16/RNA7/RNA6 models with different rate array
+    // sizes share the same checkpoint.
+    checkpoint->startStruct("ModelRNA_" + rna_model_name);
 }
 
 void ModelRNA::saveCheckpoint() {
@@ -840,47 +1063,169 @@ void ModelRNA::saveCheckpoint() {
     startCheckpoint();
     CKP_ARRAY_SAVE(nrates, rates);
     endCheckpoint();
-    ModelDNA::saveCheckpoint();
+    // Bypass ModelDNA::saveCheckpoint() which saves rates with hardcoded
+    // size 6 (for 4-state DNA). Go directly to ModelMarkov.
+    ModelMarkov::saveCheckpoint();
 }
 
 void ModelRNA::restoreCheckpoint() {
     int n = num_states;
     int nrates = n * (n - 1) / 2;
 
-    if (isCollapsed() && !isFullGTR()) {
-        // For RNA7/RNA6 constrained models, bypass
-        // ModelDNA::restoreCheckpoint() because it calls setRateType()
-        // which cannot handle param_spec IDs > 9.  Instead, restore
-        // the Markov-level data directly and rebuild param_spec ourselves.
-        ModelMarkov::restoreCheckpoint();
-        // Restore the RNA rates from our own checkpoint block
-        startCheckpoint();
-        CKP_ARRAY_RESTORE(nrates, rates);
-        endCheckpoint();
-        // Rebuild param_spec, param_fixed, num_params from symmetry vector
-        applySymmetryVector();
-    } else {
-        // RNA16 variants and full-GTR RNA7/RNA6 (RNA7A, RNA7B, RNA6A): safe
-        // to use ModelDNA::restoreCheckpoint() which calls setRateType().
-        ModelDNA::restoreCheckpoint();
-        startCheckpoint();
-        CKP_ARRAY_RESTORE(nrates, rates);
-        endCheckpoint();
-        // For constrained RNA16 models: re-zero forbidden transitions.
-        if (!isFullGTR()) {
-            int k = 0;
-            for (int i = 0; i < n; i++)
-                for (int j = i + 1; j < n; j++, k++)
-                    if (computeSymVecEntry(i, j) == -1)
-                        rates[k] = 0.0;
-        }
-        // For full GTR: rebuild free-index list.
-        if (isFullGTR()) {
-            rna_free_indices.clear();
-            for (int k = 0; k < nrates - 1; k++)
-                rna_free_indices.push_back(k);
-        }
+    // Always bypass ModelDNA::restoreCheckpoint() because it hardcodes
+    // CKP_ARRAY_RESTORE(6, rates) for 4-state DNA.  RNA models have
+    // different rate array sizes (120 for 16-state, 21 for 7-state,
+    // 15 for 6-state), so we go through ModelMarkov directly.
+    ModelMarkov::restoreCheckpoint();
+
+    startCheckpoint();
+    CKP_ARRAY_RESTORE(nrates, rates);
+    endCheckpoint();
+
+    if (expanded_mode) {
+        // In expanded mode, the rates are set by expandToDoubletSpace()
+        // and should not be modified by applySymmetryVector().
+        // Just decompose the rate matrix from the restored rates.
+        decomposeRateMatrix();
+        if (phylo_tree) phylo_tree->clearAllPartialLH();
+        return;
     }
+
+    // Normal mode: rebuild param_spec, param_fixed, and constraints
+    applySymmetryVector();
+
     decomposeRateMatrix();
     if (phylo_tree) phylo_tree->clearAllPartialLH();
+}
+
+// -----------------------------------------------------------------------
+// buildDoubletToNativeMap
+//
+// Builds the reverse mapping: for each doublet index (0-15), what is the
+// corresponding native state index?
+//   - Canonical doublets map to their native index (0-5)
+//   - For RNA7: mismatch doublets map to 6 (MM state)
+//   - For RNA6: mismatch doublets map to -1 (no corresponding state)
+// -----------------------------------------------------------------------
+
+void ModelRNA::buildDoubletToNativeMap(const int *native_to_doublet,
+                                       int native_states, int *doublet_to_native) {
+    // Initialize all to -1 (unmapped)
+    for (int d = 0; d < 16; d++)
+        doublet_to_native[d] = -1;
+
+    // Map each native state to its doublet index
+    for (int s = 0; s < native_states; s++)
+        doublet_to_native[native_to_doublet[s]] = s;
+
+    // For RNA7: the MM state (index 6) maps to doublet 0 (AA) in the
+    // native_to_doublet array, but ALL 10 mismatches should map to MM.
+    if (native_states == 7) {
+        for (int k = 0; k < 10; k++)
+            doublet_to_native[mismatch_doublets[k]] = 6;  // MM
+    }
+}
+
+// -----------------------------------------------------------------------
+// expandToDoubletSpace
+//
+// Expands an RNA7 or RNA6 model's rate matrix and frequencies from
+// native state space (7 or 6 states) into the 16-state doublet space.
+//
+// This implements Douglas's ambiguity coding idea: the model is defined
+// in the smaller space but evaluated in the larger space, so that
+// likelihoods from different state spaces are directly comparable for
+// model selection (AIC/BIC).
+//
+// For RNA7 (7 → 16):
+//   Frequencies: π16[canonical_doublet] = π7[native_state]
+//                π16[mismatch_doublet]  = π7[MM] / 10
+//   Rates:       Q16[i,j] = Q7[map(i), map(j)]  for i,j both canonical
+//                Q16[i,j] = Q7[native_i, MM]     for canonical i, mismatch j
+//                Q16[i,j] = 0                     for mismatch i, mismatch j
+//
+// For RNA6 (6 → 16):
+//   Frequencies: π16[canonical_doublet] = π6[native_state]
+//                π16[mismatch_doublet]  = 0 (near-zero, MIN_RATE)
+//   Rates:       Q16[i,j] = Q6[map(i), map(j)]  for i,j both canonical
+//                Q16[i,j] = 0                     otherwise
+// -----------------------------------------------------------------------
+
+void ModelRNA::expandToDoubletSpace(double *expanded_rates,
+                                    double *expanded_freqs) const {
+    ASSERT(isCollapsed() && "expandToDoubletSpace only for RNA7/RNA6 models");
+
+    int ns = num_states;  // 7 or 6
+    const int *native_to_doublet = isRNA7() ? rna7_to_doublet : rna6_to_doublet;
+
+    // Build reverse mapping: doublet index → native state index
+    int d2n[16];
+    buildDoubletToNativeMap(native_to_doublet, ns, d2n);
+
+    // --- Expand frequencies ---
+    if (isRNA7()) {
+        double mm_freq = state_freq[6] / 10.0;  // MM split equally
+        for (int d = 0; d < 16; d++) {
+            int native = d2n[d];
+            if (native >= 0 && native < 6)
+                expanded_freqs[d] = state_freq[native];  // canonical pair
+            else
+                expanded_freqs[d] = mm_freq;             // mismatch
+        }
+    } else {
+        // RNA6: mismatches get near-zero frequency
+        double total = 0.0;
+        for (int d = 0; d < 16; d++) {
+            int native = d2n[d];
+            if (native >= 0)
+                expanded_freqs[d] = state_freq[native];
+            else
+                expanded_freqs[d] = MIN_RATE;  // near-zero
+            total += expanded_freqs[d];
+        }
+        // Renormalize
+        for (int d = 0; d < 16; d++)
+            expanded_freqs[d] /= total;
+    }
+
+    // --- Expand rates ---
+    // The native rates[] array stores upper-triangle entries in row-major
+    // order: for states i < j, index = i * ns - i*(i+1)/2 + j - i - 1
+    //
+    // The expanded rates[] array uses the same convention for 16 states:
+    // for doublets i < j, index = i * 16 - i*(i+1)/2 + j - i - 1
+
+    int k16 = 0;
+    for (int di = 0; di < 16; di++) {
+        for (int dj = di + 1; dj < 16; dj++, k16++) {
+            int ni = d2n[di];  // native state for doublet di
+            int nj = d2n[dj];  // native state for doublet dj
+
+            if (ni < 0 || nj < 0) {
+                // RNA6: at least one doublet has no native state → rate = 0
+                expanded_rates[k16] = 0.0;
+                continue;
+            }
+
+            if (isRNA7() && ni == 6 && nj == 6) {
+                // Both are mismatches (both map to MM) → rate = 0
+                expanded_rates[k16] = 0.0;
+                continue;
+            }
+
+            if (ni == nj) {
+                // Same native state (e.g., two different mismatches both
+                // mapping to MM in RNA7) — already handled above.
+                // For canonical states this can't happen (1:1 mapping).
+                expanded_rates[k16] = 0.0;
+                continue;
+            }
+
+            // Look up the rate from the native model
+            int si = min(ni, nj);
+            int sj = max(ni, nj);
+            int native_idx = si * ns - si * (si + 1) / 2 + sj - si - 1;
+            expanded_rates[k16] = rates[native_idx];
+        }
+    }
 }
