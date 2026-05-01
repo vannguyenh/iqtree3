@@ -121,8 +121,22 @@ public:
     /**
      * Compute tip likelihood vector for a doublet state.
      * Overrides ModelDNA's version which handles 4-state ambiguity codes.
+     *
+     * In expanded mode (for cross-state-space model selection), the model
+     * operates in 16-state space but the tip vector encodes ambiguity:
+     *   RNA7: mismatch doublet -> 1 at all 10 mismatch positions
+     *   RNA6: mismatch doublet -> 1 at all 16 positions (gap/uninformative)
      */
     virtual void computeTipLikelihood(PML::StateType state, double *state_lk);
+
+    /**
+     * Enable expanded mode for cross-state-space model selection.
+     * When enabled, the model uses the 16x16 expanded rate matrix and
+     * frequencies from expandToDoubletSpace(), and computeTipLikelihood()
+     * returns ambiguity-coded vectors for mismatch observations.
+     * The native model (rates, state_freq, num_states) is NOT modified.
+     */
+    void setExpandedMode(bool enable) { expanded_mode = enable; }
 
     /** Checkpoint support. */
     virtual void startCheckpoint();
@@ -136,9 +150,30 @@ public:
     virtual void setVariables(double *variables);
     virtual bool getVariables(double *variables);
 
+    /**
+     * Override getNDim() and getNDimFreq() to return the correct number
+     * of free parameters in expanded mode.  ModelMarkov uses num_states
+     * (=16) to compute freq dimensions, but expanded RNA7/RNA6 models
+     * have fewer free frequencies from their native state space.
+     * In normal mode, delegates to ModelDNA (unchanged).
+     */
+    virtual int getNDim();
+    virtual int getNDimFreq();
+
 private:
     RNAModelVariant variant;
     string rna_model_name;
+
+    /** When true, the model operates in 16-state expanded space for model
+     *  selection.  computeTipLikelihood() returns ambiguity-coded vectors.
+     *  Default: false (normal mode). */
+    bool expanded_mode = false;
+
+    /** In expanded mode: native free rate params and freq params
+     *  for correct AIC/BIC computation via getNDim()/getNDimFreq().
+     *  Set during init() expansion. */
+    int native_num_rate_params = 0;
+    int native_num_freq_params = 0;
 
     /** @return true if this is an RNA7 family variant. */
     bool isRNA7() const { return variant >= RNA7A && variant <= RNA7F; }
@@ -196,6 +231,37 @@ private:
      *   2 = mismatch
      */
     static int doubletClass(int state);
+
+    // ---- Ambiguity-coding expansion for cross-state-space model selection ----
+
+    /**
+     * Expand an RNA7 or RNA6 model into 16-state doublet space.
+     *
+     * Takes the native rate matrix (rates[]) and state frequencies
+     * (state_freq[]) in the model's own state space (7 or 6 states)
+     * and produces the equivalent 16×16 rate matrix and 16 frequencies.
+     *
+     * Mapping rules:
+     *   - Each canonical pair (AU,CG,GC,GU,UA,UG) maps 1:1 to its
+     *     doublet index.
+     *   - For RNA7: the MM state frequency is split equally across
+     *     the 10 mismatch doublets; rates involving MM are replicated
+     *     for each mismatch doublet.  Mismatch↔mismatch rates = 0.
+     *   - For RNA6: mismatch doublets get near-zero frequency;
+     *     rates involving mismatches = 0.
+     *
+     * @param[out] expanded_rates   120-element upper-triangle rate array (16×16)
+     * @param[out] expanded_freqs   16-element state frequency array
+     */
+    void expandToDoubletSpace(double *expanded_rates, double *expanded_freqs) const;
+
+    /**
+     * Build the mapping from doublet index (0-15) to native state index.
+     * For RNA7: canonical doublets map to 0-5, mismatch doublets map to 6 (MM).
+     * For RNA6: canonical doublets map to 0-5, mismatch doublets map to -1.
+     */
+    static void buildDoubletToNativeMap(const int *native_to_doublet,
+                                        int native_states, int *doublet_to_native);
 };
 
 /**
