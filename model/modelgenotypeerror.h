@@ -88,6 +88,19 @@ public:
     virtual void setVariables(double *variables);
 
     /**
+     * Override: optimise Q-matrix and freqs jointly via parent BFGS,
+     * then delta and epsilon independently via 1D Brent. Mirrors CellPhy
+     * (Kozlov et al. 2022, Methods "Model parameter optimization").
+     */
+    virtual double optimizeParameters(double gradient_epsilon);
+
+    /**
+     * Override: 1D objective function used by minimizeOneDimen during the
+     * Brent steps for delta and epsilon. opt_target selects which.
+     */
+    virtual double computeFunction(double value);
+
+    /**
      * Checkpoint functions
      */
     virtual void startCheckpoint();
@@ -129,6 +142,10 @@ protected:
 
     /** Error model name (e.g., "+E") */
     string error_name;
+
+    /** Which parameter the 1D Brent step is currently optimising */
+    enum OptTarget { OPT_NONE, OPT_DELTA, OPT_EPSILON };
+    OptTarget opt_target = OPT_NONE;
 
     /**
      * Compute error probability P(observed | true_state)

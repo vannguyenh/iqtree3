@@ -16,7 +16,7 @@ ModelGenotypeError::ModelGenotypeError(PhyloTree *tree)
 : ModelGenotype(tree)
 {
     delta = 0.1;      // Default ADO rate: 10%
-    epsilon = 0.001;  // Default error rate: 0.1%
+    epsilon = 0.005;  // Default error rate: 0.1%
     fix_delta = false;
     fix_epsilon = false;
     error_name = "+E";
@@ -260,4 +260,68 @@ void ModelGenotypeError::setVariables(double *variables) {
     if (!fix_epsilon) {
         variables[id] = epsilon;
     }
+}
+
+double ModelGenotypeError::computeFunction(double value) {
+    // 1D objective for Brent. opt_target selects which parameter receives `value`.
+    if (opt_target == OPT_DELTA)        delta   = value;
+    else if (opt_target == OPT_EPSILON) epsilon = value;
+    // delta/epsilon affect tip likelihoods only (not Q), so just clear partials.
+    phylo_tree->clearAllPartialLH();
+    return -phylo_tree->computeLikelihood();
+}
+
+double ModelGenotypeError::optimizeParameters(double gradient_epsilon) {
+    if (fixed_parameters) return 0.0;
+
+    // BFGS mode: pack delta and epsilon into the joint vector with rates/freqs
+    // and run ModelMarkov's joint DFP-BFGS. The base class picks up our
+    // getNDim/setVariables/setBounds overrides via virtual dispatch.
+    if (Params::getInstance().optimize_gt_err == "BFGS") {
+        return ModelMarkov::optimizeParameters(gradient_epsilon);
+    }
+
+    const int MAX_OUTER_ITER = 5;
+    const double TOL = max(gradient_epsilon, 1e-4);
+
+    double cur_score = phylo_tree->computeLikelihood();
+    double prev_score;
+
+    for (int iter = 0; iter < MAX_OUTER_ITER; iter++) {
+        prev_score = cur_score;
+
+        // Phase 1: optimise Q-matrix and frequencies only (temporarily fix delta, epsilon)
+        bool save_fd = fix_delta;
+        bool save_fe = fix_epsilon;
+        fix_delta = true;
+        fix_epsilon = true;
+        cur_score = ModelGenotype::optimizeParameters(gradient_epsilon);
+        fix_delta = save_fd;
+        fix_epsilon = save_fe;
+
+        // Phase 2: 1D Brent for delta alone
+        if (!fix_delta) {
+            opt_target = OPT_DELTA;
+            double neg_lh = 0.0, ferror = 0.0;
+            delta = minimizeOneDimen(MIN_DELTA, delta, MAX_DELTA,
+                                     TOL, &neg_lh, &ferror);
+            cur_score = -neg_lh;
+        }
+
+        // Phase 3: 1D Brent for epsilon alone
+        if (!fix_epsilon) {
+            opt_target = OPT_EPSILON;
+            double neg_lh = 0.0, ferror = 0.0;
+            epsilon = minimizeOneDimen(MIN_EPSILON, epsilon, MAX_EPSILON,
+                                       TOL, &neg_lh, &ferror);
+            cur_score = -neg_lh;
+        }
+
+        opt_target = OPT_NONE;
+
+        // Outer-loop convergence check
+        if (fabs(cur_score - prev_score) < TOL) break;
+    }
+
+    return cur_score;
 }
