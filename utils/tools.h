@@ -1817,6 +1817,17 @@ public:
     string optimize_alg_qmix;
 
     /**
+     *  Optimizer for the genotype error model (+E) parameters delta and epsilon.
+     *  Stored canonically as "BRENT" or "BFGS"; CLI parsing is case-insensitive.
+     *  "BRENT" (default): alternate joint BFGS over rates/freqs (with delta, epsilon
+     *      frozen) and 1D Brent on delta then epsilon, mirroring CellPhy
+     *      (Kozlov et al. 2022).
+     *  "BFGS": pack rates, freqs, delta, epsilon into a single vector and run
+     *      ModelMarkov's joint DFP-BFGS.
+     */
+    string optimize_gt_err;
+
+    /**
      * non-zero if want to estimate the initial frequency vectors for q-mixture model
      */
     int estimate_init_freq;

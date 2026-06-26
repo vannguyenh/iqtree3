@@ -1297,6 +1297,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.optimize_alg_treeweight = "EM";
     params.optimize_from_given_params = false;
     params.optimize_alg_qmix = "BFGS";
+    params.optimize_gt_err = "BRENT";
     params.estimate_init_freq = 0;
 
     // defaults for new options -JD
@@ -3067,6 +3068,17 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.alisim_genotype_hom_ratio = convert_double(argv[cnt]);
                 if (params.alisim_genotype_hom_ratio <= 0.7 || params.alisim_genotype_hom_ratio >= 1.0)
                     throw "The homozygous ratio (--gt-hom-ratio) must be in [0.7, 1.0)";
+                continue;
+            }
+            if (strcmp(argv[cnt], "-optimize-gt-err") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -optimize-gt-err <BFGS|BRENT>";
+                string val = argv[cnt];
+                transform(val.begin(), val.end(), val.begin(), ::toupper);
+                if (val != "BFGS" && val != "BRENT")
+                    throw "Use -optimize-gt-err <BFGS|BRENT>";
+                params.optimize_gt_err = val;
                 continue;
             }
             if (strcmp(argv[cnt], "--indel") == 0) {
@@ -7748,6 +7760,7 @@ void Params::setDefault() {
     optimize_alg_treeweight = "EM";
     optimize_from_given_params = false;
     optimize_alg_qmix = "BFGS";
+    optimize_gt_err = "BRENT";
     estimate_init_freq = 0;
 
     // defaults for new options -JD
