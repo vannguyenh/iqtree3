@@ -9,14 +9,14 @@
 #define MAX_DELTA 0.99
 
 // Bounds for amplification/sequencing error probability (epsilon)
-#define MIN_EPSILON 0.0001
+#define MIN_EPSILON 0.0005
 #define MAX_EPSILON 0.5
 
 ModelGenotypeError::ModelGenotypeError(PhyloTree *tree)
 : ModelGenotype(tree)
 {
-    delta = 0.1;      // Default ADO rate: 10%
-    epsilon = 0.005;  // Default error rate: 0.1%
+    delta = 0.3;      // Default ADO rate: 30%
+    epsilon = 0.010;  // Default error rate: 1.0%
     fix_delta = false;
     fix_epsilon = false;
     error_name = "+E";
@@ -30,8 +30,8 @@ ModelGenotypeError::ModelGenotypeError(const char *model_name,
                                        PhyloTree *tree)
 : ModelGenotype(model_name, model_params, freq_type, freq_params, tree)
 {
-    delta = 0.1;
-    epsilon = 0.001;
+    delta = 0.3;      // matches the parameterless constructor's bumped default
+    epsilon = 0.010;
     fix_delta = false;
     fix_epsilon = false;
     error_name = error_spec;
@@ -264,8 +264,10 @@ void ModelGenotypeError::setVariables(double *variables) {
 
 double ModelGenotypeError::computeFunction(double value) {
     // 1D objective for Brent. opt_target selects which parameter receives `value`.
-    if (opt_target == OPT_DELTA)        delta   = value;
-    else if (opt_target == OPT_EPSILON) epsilon = value;
+    if (opt_target == OPT_DELTA)
+        delta   = value;
+    else if (opt_target == OPT_EPSILON)
+        epsilon = value;
     // delta/epsilon affect tip likelihoods only (not Q), so just clear partials.
     phylo_tree->clearAllPartialLH();
     return -phylo_tree->computeLikelihood();
