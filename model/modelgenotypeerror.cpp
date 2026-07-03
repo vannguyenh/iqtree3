@@ -1,5 +1,5 @@
 //
-// Created by Van Nguyen Hoang on 09/02/2026.
+// Created by Van Nguyen Hoang on 09/02/2026.  
 //
 
 #include "modelgenotypeerror.h"
@@ -9,7 +9,9 @@
 #define MAX_DELTA 0.99
 
 // Bounds for amplification/sequencing error probability (epsilon)
-#define MIN_EPSILON 0.0005
+// MIN_EPSILON = 1e-6: principled numerical floor, comparable to CellPhy's apparent behavior,
+// well below any biologically plausible error rate so hitting it clearly indicates "collapsed"
+#define MIN_EPSILON 1e-6
 #define MAX_EPSILON 0.5
 
 ModelGenotypeError::ModelGenotypeError(PhyloTree *tree)
