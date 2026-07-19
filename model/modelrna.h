@@ -265,8 +265,9 @@ private:
 };
 
 /**
- * Return the position of "+RNA16", "+RNA16A", "+RNA16B", "+RNA7A".."+RNA7F",
- * "+RNA6A".."+RNA6E" in the model name string, or string::npos if not found.
+ * Return the position of "+S16", "+S16A", "+S16B", "+S7A".."+S7F",
+ * "+S6A".."+S6E" — or their legacy "+RNA..." aliases — in the model name
+ * string, or string::npos if not found.
  */
 string::size_type posRNA(const string &model_name);
 

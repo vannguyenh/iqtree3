@@ -827,9 +827,17 @@ void SuperAlignment::readPartitionRNA(Params &params) {
     // Determine model names for the two partitions.
     //
     // Syntax: -m <loop_model>/<stem_model>
-    //   e.g.  -m JC/RNA16+G       (JC for loops, RNA16+G for stems; +G propagated)
-    //         -m JC+I/RNA16+G     (JC+I for loops, RNA16+G for stems; no propagation)
-    //         -m RNA16+G          (no slash: loops default to GTR+F+G)
+    //   e.g.  -m JC/S16+G         (JC for loops, S16+G for stems; +G propagated)
+    //         -m JC+I/S16+G       (JC+I for loops, S16+G for stems; no propagation)
+    //         -m S16+G            (no slash: loops default to GTR+F+G)
+    //         -m JC/RNA16+G       (legacy alias; identical to -m JC/S16+G)
+    //         -m RNA7A            (legacy alias; identical to -m S7A)
+    //
+    // The stem model takes either the RAxML-style name (S16, S16A, S16B,
+    // S7A..S7F, S6A..S6E) or its legacy RNA-prefixed alias (RNA16, RNA16A,
+    // RNA7A, RNA6A, ...).  Both spellings select the same model; only the
+    // S7/RNA7 and S6/RNA6 families collapse the stem alignment below 16
+    // states (see below), so every 16-state name simply falls through.
     //
     // Partition order: loops first (ID 1 = DNA), stems second (ID 2 = RNA).
     // This matches RAxML: partition [0] = DNA loops, partition [1] = RNA stems.
@@ -837,7 +845,9 @@ void SuperAlignment::readPartitionRNA(Params &params) {
     // Rate-heterogeneity propagation: +G/+I/+R tokens from the stem model are
     // appended to the loop model only when the loop side has no rate token yet.
 
-    string full_model = params.model_name.empty() ? "RNA16A" : params.model_name;
+    // An explicit -m is taken verbatim (so either spelling works); "S16A" is
+    // only the fallback used when no -m was given at all.
+    string full_model = params.model_name.empty() ? "S16A" : params.model_name;
     string stem_model, loop_model;
 
     // --- Step 1: split on '/' ---
@@ -857,7 +867,8 @@ void SuperAlignment::readPartitionRNA(Params &params) {
 
     // --- Step 2: extract rate tokens from the stem model ---
     // Only +G/+I/+R tokens are collected (single letter followed by digit/'{'/end).
-    // Multi-letter model names (+GTR, +HKY, +RNA16) and frequency tokens are ignored.
+    // Multi-letter model names (+GTR, +HKY, +S16, +RNA16) and frequency tokens
+    // are ignored.
     string rate_suffix;
     {
         size_t plus_pos = stem_model.find('+');
@@ -927,14 +938,17 @@ void SuperAlignment::readPartitionRNA(Params &params) {
     }
 
     // --- Build stems partition — ID 2, matches RAxML partition [1] ---
-    // If the user specified an RNA7 or RNA6 model, collapse to 7 or 6 states;
+    // If the user specified an S7 or S6 model, collapse to 7 or 6 states;
     // otherwise keep 16.
     if (!stem_pairs.empty()) {
         Alignment *stem_aln_16 = new Alignment();
         stem_aln_16->convertDNAToDoublet(dna_aln, stem_pairs);
 
-        bool is_rna7 = (stem_model.find("RNA7") != string::npos);
-        bool is_rna6 = (stem_model.find("RNA6") != string::npos);
+        // Accept both spellings: S7A.. / RNA7A.. and S6A.. / RNA6A..
+        bool is_rna7 = (stem_model.find("S7") != string::npos ||
+                        stem_model.find("RNA7") != string::npos);
+        bool is_rna6 = (stem_model.find("S6") != string::npos ||
+                        stem_model.find("RNA6") != string::npos);
 
         Alignment *stem_aln;
         if (is_rna7) {

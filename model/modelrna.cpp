@@ -333,13 +333,23 @@ void ModelRNA::getRNA6SymmetrySpec(int *sym_vec, int *freq_group) const {
 }
 
 // -----------------------------------------------------------------------
-// posRNA — find "+RNA16", "+RNA16A", "+RNA16B", "+RNA7A".."+RNA7F",
-//          "+RNA6A".."+RNA6E" in model string
+// posRNA — find "+S16", "+S16A", "+S16B", "+S7A".."+S7F", "+S6A".."+S6E"
+//          (RAxML-style names) or their legacy "+RNA..." equivalents
+//          in the model string
 // -----------------------------------------------------------------------
 
 string::size_type posRNA(const string &model_name) {
-    // Longer tokens first so "+RNA16A" matches before "+RNA16".
+    // Longer tokens first so "+S16A" matches before "+S16".
     static const char* tokens[] = {
+        "+S16A", "*S16A", "+S16B", "*S16B",
+        "+S16",  "*S16",
+        "+S7A",  "*S7A",  "+S7B",  "*S7B",
+        "+S7C",  "*S7C",  "+S7D",  "*S7D",
+        "+S7E",  "*S7E",  "+S7F",  "*S7F",
+        "+S6A",  "*S6A",  "+S6B",  "*S6B",
+        "+S6C",  "*S6C",  "+S6D",  "*S6D",
+        "+S6E",  "*S6E",
+        // Legacy RNA-prefixed aliases
         "+RNA16A", "*RNA16A", "+RNA16B", "*RNA16B",
         "+RNA16",  "*RNA16",
         "+RNA7A",  "*RNA7A",  "+RNA7B",  "*RNA7B",
@@ -365,14 +375,14 @@ string::size_type posRNA(const string &model_name) {
 
 ModelRNA::ModelRNA(PhyloTree *tree)
 : ModelDNA(tree),
-  variant(RNA16), rna_model_name("RNA16")
+  variant(RNA16), rna_model_name("S16")
 {}
 
 ModelRNA::ModelRNA(const char *model_name, string model_params,
                    StateFreqType freq_type, string freq_params,
                    PhyloTree *tree)
 : ModelDNA(tree),
-  variant(RNA16), rna_model_name("RNA16")
+  variant(RNA16), rna_model_name("S16")
 {
     init(model_name, model_params, freq_type, freq_params);
 }
@@ -629,50 +639,53 @@ void ModelRNA::init(const char *model_name, string model_params,
     if (!mname.empty() && (mname[0] == '+' || mname[0] == '*'))
         mname = mname.substr(1);
 
-    if (mname == "RNA16A") {
+    // Both the RAxML-style names (S16, S16A, S7A, S6A, ...) and the legacy
+    // RNA-prefixed names (RNA16, RNA16A, RNA7A, RNA6A, ...) select the same
+    // model.  Match on a normalised key ("RNA16A" -> "S16A"), but keep the
+    // spelling the user typed in rna_model_name so it is echoed in the output.
+    string key = mname;
+    if (key.compare(0, 3, "RNA") == 0)
+        key = "S" + key.substr(3);
+
+    if (key == "S16A") {
         variant = RNA16A;
-        rna_model_name = "RNA16A";
-    } else if (mname == "RNA16B") {
+    } else if (key == "S16B") {
         variant = RNA16B;
-        rna_model_name = "RNA16B";
-    } else if (mname == "RNA7A") {
+    } else if (key == "S7A") {
         variant = RNA7A;
-        rna_model_name = "RNA7A";
-    } else if (mname == "RNA7B") {
+    } else if (key == "S7B") {
         variant = RNA7B;
-        rna_model_name = "RNA7B";
-    } else if (mname == "RNA7C") {
+    } else if (key == "S7C") {
         variant = RNA7C;
-        rna_model_name = "RNA7C";
-    } else if (mname == "RNA7D") {
+    } else if (key == "S7D") {
         variant = RNA7D;
-        rna_model_name = "RNA7D";
-    } else if (mname == "RNA7E") {
+    } else if (key == "S7E") {
         variant = RNA7E;
-        rna_model_name = "RNA7E";
-    } else if (mname == "RNA7F") {
+    } else if (key == "S7F") {
         variant = RNA7F;
-        rna_model_name = "RNA7F";
-    } else if (mname == "RNA6A") {
+    } else if (key == "S6A") {
         variant = RNA6A;
-        rna_model_name = "RNA6A";
-    } else if (mname == "RNA6B") {
+    } else if (key == "S6B") {
         variant = RNA6B;
-        rna_model_name = "RNA6B";
-    } else if (mname == "RNA6C") {
+    } else if (key == "S6C") {
         variant = RNA6C;
-        rna_model_name = "RNA6C";
-    } else if (mname == "RNA6D") {
+    } else if (key == "S6D") {
         variant = RNA6D;
-        rna_model_name = "RNA6D";
-    } else if (mname == "RNA6E") {
+    } else if (key == "S6E") {
         variant = RNA6E;
-        rna_model_name = "RNA6E";
-    } else {
-        // default: RNA16 (also accepts bare "RNA16")
+    } else if (key == "S16" || mname.empty()) {
+        // Bare "S16" (or no model name at all) -> full 16-state model.
         variant = RNA16;
-        rna_model_name = "RNA16";
+        if (mname.empty())
+            mname = "S16";
+    } else {
+        // Anything else is a typo: fail loudly rather than silently running a
+        // different (default) model.
+        outError("Unrecognized RNA doublet model \"" + mname +
+                 "\".\nValid models: S16, S16A, S16B, S7A-S7F, S6A-S6E"
+                 " (or the legacy RNA16/RNA7*/RNA6* spellings).");
     }
+    rna_model_name = mname;
 
     this->freq_type = freq_type;
 

@@ -701,14 +701,25 @@ void reportModel(ostream &out, Alignment *aln, ModelSubst *m) {
             out << " " << state_freq[i];
         out << endl << endl;
         out.precision(4);
+    } else if (aln->seq_type == SEQ_DOUBLET) {
+        // RNA doublet models (16/7/6-state): print per-pair equilibrium
+        // frequencies under a header naming the exact model in both spellings
+        // (e.g. "RNA7A/S7A state frequencies:").  A doublet model is always a
+        // ModelRNA, which derives from ModelMarkov.
+        ((ModelMarkov*)m)->report_state_freqs(out);
     }
-    
+
     delete[] rate_mat;
 
     if (aln->seq_type == SEQ_POMO) {
         m->report(out);
         return;
     }
+
+    if (aln->seq_type == SEQ_DOUBLET)
+        // The labeled "RNA7A/S7A state frequencies:" block was already printed
+        // above; skip the generic per-state block below to avoid duplication.
+        return;
 
     out << "State frequencies: ";
     if (m->isSiteSpecificModel())
@@ -1433,6 +1444,18 @@ void reportSubstitutionProcess(ostream &out, Params &params, IQTree &tree)
                 out << left << (*it)->getModelName() << " " << stree->part_info[part].part_rate  << "  " << (*it)->getModelNameParams(show_full_params) << endl;
         }
         out << endl;
+
+        // For RNA doublet partitions, add a labeled per-pair state-frequency
+        // block.  The compact table above only shows the packed +F{...} array,
+        // so print each pair's equilibrium frequency under a header naming the
+        // exact model in both spellings (e.g. "RNA7A/S7A state frequencies:").
+        for (it = stree->begin(), part = 0; it != stree->end(); it++, part++) {
+            if ((*it)->aln->seq_type == SEQ_DOUBLET) {
+                out << "Partition " << (part + 1) << " (" << (*it)->aln->name
+                    << "):" << endl;
+                reportModel(out, (*it)->aln, (*it)->getModel());
+            }
+        }
         /*
         for (it = stree->begin(), part = 0; it != stree->end(); it++, part++) {
             reportModel(out, *(*it));

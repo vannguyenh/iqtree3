@@ -70,12 +70,12 @@ const char* morph_model_names[] = {"MK"};
 
 /******* RNA doublet model set (all three state spaces) ******/
 const char* rna_model_names[] = {
-    "RNA16", "RNA16A", "RNA16B",
-    "RNA7A", "RNA7B", "RNA7C", "RNA7D", "RNA7E", "RNA7F",
-    "RNA6A", "RNA6B", "RNA6C", "RNA6D", "RNA6E"
+    "S16", "S16A", "S16B",
+    "S7A", "S7B", "S7C", "S7D", "S7E", "S7F",
+    "S6A", "S6B", "S6C", "S6D", "S6E"
 };
 const char* rna_freq_names[] = {"+F"};
-const char* doublet_usual_model = "RNA16A";
+const char* doublet_usual_model = "S16A";
 
 
 /******* DNA model set ******/
@@ -980,6 +980,71 @@ void transferModelFinderParameters(IQTree *iqtree, Checkpoint *target) {
 }
 
 /**
+ * @return true if model_name names an RNA doublet model, in either the
+ * RAxML-style spelling (S16A) or the legacy RNA-prefixed one (RNA16A).
+ * Any +F/+G/... suffix is ignored.
+ */
+static bool isDoubletModelName(string name) {
+    size_t pos = name.find_first_of("+*");
+    if (pos != string::npos)
+        name = name.substr(0, pos);
+    transform(name.begin(), name.end(), name.begin(), ::toupper);
+    if (name.compare(0, 3, "RNA") == 0)
+        name = "S" + name.substr(3);
+    for (size_t i = 0; i < sizeof(rna_model_names) / sizeof(char*); i++)
+        if (name == rna_model_names[i])
+            return true;
+    return false;
+}
+
+/**
+ * Resolve the global -mset value for one partition of an --rna-structure
+ * analysis, which mixes DNA (loop) and doublet (stem) partitions.
+ *
+ * Mirrors the -m <loop_model>/<stem_model> syntax:
+ *   "JC,HKY/S6A,S7A"  loops get "JC,HKY", stems get "S6A,S7A"
+ *   "S6A,S7A"         stems get "S6A,S7A"; loops fall back to their default
+ *   "GTR,HKY"         loops get "GTR,HKY"; stems fall back to their default
+ *
+ * Without this, the single global -mset reaches both partitions: an RNA name
+ * makes the DNA partition treat it as a user-defined model file, and a DNA
+ * name silently collapses the stems to the default S16.
+ *
+ * @return the model set for this data type; "" means "use its built-in default".
+ */
+static string resolveModelSetForSeqType(string model_set, SeqType seq_type) {
+    if (model_set.empty())
+        return model_set;
+
+    // Explicit <loop_set>/<stem_set> split
+    size_t slash = model_set.find('/');
+    if (slash != string::npos)
+        return (seq_type == SEQ_DOUBLET) ? model_set.substr(slash + 1)
+                                         : model_set.substr(0, slash);
+
+    // No slash: keep only the entries belonging to this partition's data type.
+    // A leading '+' (the append-to-defaults form) is preserved.
+    string prefix;
+    if (model_set[0] == '+') {
+        prefix = "+";
+        model_set = model_set.substr(1);
+    }
+    StrVector names;
+    convert_string_vec(model_set.c_str(), names);
+    string kept;
+    for (auto &name : names) {
+        if ((seq_type == SEQ_DOUBLET) == isDoubletModelName(name)) {
+            if (!kept.empty())
+                kept += ",";
+            kept += name;
+        }
+    }
+    if (kept.empty())
+        return "";   // nothing for this data type: fall back to its default
+    return prefix + kept;
+}
+
+/**
  * get the list of substitution models
  */
 void getModelSubst(SeqType seq_type, bool standard_code, string model_name,
@@ -993,6 +1058,12 @@ void getModelSubst(SeqType seq_type, bool standard_code, string model_name,
 
     if (iEquals(model_set, "ALL") || iEquals(model_set, "AUTO") || iEquals(model_set, "reversible"))
         model_set = "";
+
+    // An --rna-structure analysis mixes DNA (loops) and doublet (stems)
+    // partitions, but -mset is a single global option.  Resolve it per data
+    // type so each partition only ever sees models it can actually use.
+    if (Params::getInstance().rna_structure_file)
+        model_set = resolveModelSetForSeqType(model_set, seq_type);
 
     if (seq_type == SEQ_BINARY) {
         if (model_set.empty()) {
@@ -3355,8 +3426,10 @@ CandidateModel CandidateModelSet::test(Params &params, PhyloTree* in_tree, Model
             if (score >= DBL_MAX)
                 continue;
 
-            // RNA6 models ignore mismatches; RNA7/RNA16 consider them
-            bool is_rna6 = (mname.find("RNA6") != string::npos);
+            // S6 models ignore mismatches; S7/S16 consider them.
+            // getName() may echo either spelling (S6A.. or RNA6A..).
+            bool is_rna6 = (mname.find("S6") != string::npos ||
+                            mname.find("RNA6") != string::npos);
 
             if (is_rna6) {
                 if (score < best_score_without_mm) {
