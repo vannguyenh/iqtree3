@@ -62,7 +62,8 @@ string::size_type posPOMO(string &model_name);
 string::size_type posGENOTYPE(const string &model_name);
 
 /**
-    return the position of +RNA16, +RNA16A, +RNA16B in the model name
+    return the position of +S16, +S16A, +S16B (or the legacy +RNA16,
+    +RNA16A, +RNA16B aliases) in the model name
     @param model_name model name string
     @return position in the model string, string::npos if not found
 */

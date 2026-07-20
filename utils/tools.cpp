@@ -6416,6 +6416,10 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "                       If 'mrbayes' is selected, will output a MrBayes" << endl
     << "                       Block File if Data Type is supported." << endl
     << "  --mset STR,...       Comma-separated model list (e.g. -mset WAG,LG,JTT)" << endl
+    << "                       With --rna-structure, use <loop_set>/<stem_set>" << endl
+    << "                       (e.g. -mset JC,HKY/S6A,S7A). Without a slash, each" << endl
+    << "                       partition takes the models that match its data type" << endl
+    << "                       and falls back to its default list otherwise." << endl
     << "  --msub STRING        Amino-acid model source" << endl
     << "                       (nuclear, mitochondrial, chloroplast or viral)" << endl
     << "  --mfreq STR,...      List of state frequencies" << endl
