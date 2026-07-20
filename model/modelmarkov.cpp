@@ -426,6 +426,24 @@ void ModelMarkov::report_rates(ostream& out, string title, double *r) {
   }
 }
 
+// Build the "RNA7A/S7A state frequencies:" header for a collapsed doublet
+// model.  getName() returns the exact variant in whichever spelling the user
+// typed (e.g. "S7A" or "RNA7A"); show both spellings so the header is
+// unambiguous regardless of how the model was requested.
+static string doubletFreqHeader(const string &name) {
+    string s_form, rna_form;
+    if (name.compare(0, 3, "RNA") == 0) {
+        rna_form = name;
+        s_form   = "S" + name.substr(3);
+    } else if (!name.empty() && name[0] == 'S') {
+        s_form   = name;
+        rna_form = "RNA" + name.substr(1);
+    } else {
+        return name + " state frequencies:";  // unexpected: print as-is
+    }
+    return rna_form + "/" + s_form + " state frequencies:";
+}
+
 void ModelMarkov::report_state_freqs(ostream& out, double *custom_state_freq) {
     double *f;
     if (custom_state_freq) f = custom_state_freq;
@@ -463,17 +481,18 @@ void ModelMarkov::report_state_freqs(ostream& out, double *custom_state_freq) {
         // RNA 16-state doublet model: states encoded as b1*4+b2 (A=0,C=1,G=2,U=3)
         static const char* bases = "ACGU";
         out << setprecision(4);
-        out << "Doublet state frequencies:" << endl;
+        out << doubletFreqHeader(getName()) << endl;
         for (int i = 0; i < 16; i++) {
             out << "  " << bases[i>>2] << bases[i&3] << ": " << f[i];
             if (i % 4 == 3) out << endl;
         }
+        out << endl;
     } else if (num_states == 6 && phylo_tree && phylo_tree->aln &&
                phylo_tree->aln->seq_type == SEQ_DOUBLET) {
         // RNA 6-state collapsed doublet model
         static const char* rna6_names[] = {"AU", "CG", "GC", "GU", "UA", "UG"};
         out << setprecision(4);
-        out << "RNA6 state frequencies:" << endl;
+        out << doubletFreqHeader(getName()) << endl;
         for (int i = 0; i < 6; i++) {
             out << "  " << rna6_names[i] << ": " << f[i];
             if ((i + 1) % 3 == 0) out << endl;
@@ -484,7 +503,7 @@ void ModelMarkov::report_state_freqs(ostream& out, double *custom_state_freq) {
         // RNA 7-state collapsed doublet model
         static const char* rna7_names[] = {"AU", "CG", "GC", "GU", "UA", "UG", "MM"};
         out << setprecision(4);
-        out << "RNA7 state frequencies:" << endl;
+        out << doubletFreqHeader(getName()) << endl;
         for (int i = 0; i < 7; i++) {
             out << "  " << rna7_names[i] << ": " << f[i];
             if ((i + 1) % 4 == 0) out << endl;
