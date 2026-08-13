@@ -1398,7 +1398,10 @@ void Alignment::computeConst(Pattern &pat) {
                     pat.const_char = j;
                     break;
                 }
-        } else if (seq_type == SEQ_DNA) {
+        } else if (seq_type == SEQ_DNA || seq_type == SEQ_DOUBLET) {
+            // SEQ_DOUBLET: RNA6 partial-mismatch codes share the DNA bitmask
+            // convention, so a constant-but-ambiguous column (e.g. all GG) gets
+            // const_char = (num_states-1) + bitmask, consistent with its code.
             pat.const_char = num_states-1;
             for (j = 0; j < num_states; j++)
                 if (state_app[j]) {
@@ -4339,14 +4342,21 @@ void Alignment::convertDoubletToRNA6(Alignment *aln) {
     if (aln->seq_type != SEQ_DOUBLET || aln->num_states != 16)
         outError("convertDoubletToRNA6: source must be a 16-state doublet alignment");
 
-    // Mapping from 16-state doublet index to RNA6 state index.
-    // Canonical pairs: AU(3)->0, CG(6)->1, GC(9)->2, GU(11)->3, UA(12)->4, UG(14)->5
-    // All non-canonical (mismatches): -> -1 (will become STATE_UNKNOWN)
+    // Mapping from 16-state doublet index to the RNA6 observed code.
+    // Canonical pairs -> native state 0..5 (AU,CG,GC,GU,UA,UG).
+    // Mismatches -> a partial-ambiguity code (RAxML / PHASE-manual coding),
+    // using the same bitmask convention as DNA ambiguity:
+    //   code = (num_states-1) + bitmask, one bit per compatible canonical state.
+    // A canonical state is set iff the mismatch's 1st base matches its 1st base
+    // OR the mismatch's 2nd base matches its 2nd base.  So (native bitset -> code):
+    //   AA->{AU,UA}=22  AC->{AU,GC}=10  AG->{AU,CG,UG}=40  CA->{CG,UA}=23
+    //   CC->{CG,GC}=11  CU->{AU,CG,GU}=16  GA->{GC,GU,UA}=33  GG->{CG,GC,GU,UG}=51
+    //   UC->{GC,UA,UG}=57  UU->{AU,GU,UA,UG}=62
     static const int doublet_to_rna6[16] = {
-       -1, -1, -1,  0,   // AA=-1, AC=-1, AG=-1, AU=0
-       -1, -1,  1, -1,   // CA=-1, CC=-1, CG=1,  CU=-1
-       -1,  2, -1,  3,   // GA=-1, GC=2,  GG=-1, GU=3
-        4, -1,  5, -1    // UA=4,  UC=-1, UG=5,  UU=-1
+       22, 10, 40,  0,   // AA=22, AC=10, AG=40, AU=0
+       23, 11,  1, 16,   // CA=23, CC=11, CG=1,  CU=16
+       33,  2, 51,  3,   // GA=33, GC=2,  GG=51, GU=3
+        4, 57,  5, 62    // UA=4,  UC=57, UG=5,  UU=62
     };
 
     // Copy sequence names and metadata from source alignment
@@ -4358,7 +4368,10 @@ void Alignment::convertDoubletToRNA6(Alignment *aln) {
     sequence_type = "DOUBLET";
     seq_type      = SEQ_DOUBLET;
     num_states    = 6;
-    computeUnknownState();   // sets STATE_UNKNOWN = num_states = 6
+    computeUnknownState();   // default STATE_UNKNOWN = num_states = 6, but ...
+    // ... we use the DNA-style bitmask convention for mismatch ambiguity codes,
+    // so STATE_UNKNOWN is the all-ones bitmask: (num_states-1) + (2^num_states-1).
+    STATE_UNKNOWN = (num_states - 1) + ((1 << num_states) - 1);   // = 68
 
     site_pattern.resize(aln->getNSite(), -1);
     clear();
@@ -4374,12 +4387,9 @@ void Alignment::convertDoubletToRNA6(Alignment *aln) {
         int ptn_id = aln->getPatternID(site);
         for (size_t s = 0; s < nseq; s++) {
             StateType st = aln->at(ptn_id)[s];
-            if (st < 16) {
-                int mapped = doublet_to_rna6[st];
-                pat[s] = (mapped >= 0) ? mapped : STATE_UNKNOWN;
-            } else {
-                pat[s] = STATE_UNKNOWN;
-            }
+            // st 0..15 = a concrete doublet -> native state or mismatch code;
+            // st >= 16 (gap/unknown in the 16-state alignment) -> full gap.
+            pat[s] = (st < 16) ? doublet_to_rna6[st] : STATE_UNKNOWN;
         }
         addPattern(pat, site);
     }
@@ -5786,6 +5796,7 @@ void Alignment::getAppearance(StateType state, double *state_app) {
 	int ambi_aa[] = {4+8, 32+64, 512+1024};
 	switch (seq_type) {
 	case SEQ_DNA:
+	case SEQ_DOUBLET:   // RNA6 partial-mismatch codes use the same bitmask convention
 	    state -= (num_states-1);
 		for (i = 0; i < num_states; i++)
 			if (state & (1 << i)) {
@@ -5832,6 +5843,7 @@ void Alignment::getAppearance(StateType state, StateBitset &state_app) {
 	int ambi_aa[] = {4+8, 32+64, 512+1024};
 	switch (seq_type) {
 	case SEQ_DNA:
+	case SEQ_DOUBLET:   // RNA6 partial-mismatch codes use the same bitmask convention
 	    state -= (num_states-1);
         for (i = 0; i < num_states; i++) {
             if (state & (1 << i)) {
