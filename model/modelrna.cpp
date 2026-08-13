@@ -2,7 +2,7 @@
  *   RNA doublet substitution models.                                      *
  *   See modelrna.h for full documentation.                                *
  *                                                                         *
- *   Reference:                                                             *
+ *   Reference:                                                            *
  *     Savill NJ, Hoyle DC, Higgs PG (2001) Genetics 157:399-411           *
  *                                                                         *
  *   16-state models (IQ-TREE / RAxML):                                    *
@@ -11,22 +11,22 @@
  *     RNA16B / S16B  — equal rates (0 free rates)                         *
  *                                                                         *
  *   6-state models (collapsed: 6 canonical pairs, mismatches = missing):  *
- *     RNA6A / S6A  — full GTR (14 free rates, 5 free freqs)              *
- *     RNA6B / S6B  — 3 rate classes (2+5)                                *
- *     RNA6C / S6C  — 3 rate classes, strand-sym freqs (2+2)              *
- *     RNA6D / S6D  — 2 rate classes, some forbidden, strand-sym (1+2)    *
- *     RNA6E / S6E  — 2 rate classes, some forbidden (1+5)                *
+ *     RNA6A / S6A  — full GTR (14 free rates, 5 free freqs)               *
+ *     RNA6B / S6B  — 3 rate classes (2+5)                                 *
+ *     RNA6C / S6C  — 3 rate classes, strand-sym freqs (2+2)               *
+ *     RNA6D / S6D  — 2 rate classes, some forbidden, strand-sym (1+2)     *
+ *     RNA6E / S6E  — 2 rate classes, some forbidden (1+5)                 *
  *                                                                         *
  *   7-state models (collapsed: 6 canonical pairs + MM):                   *
- *     RNA7A / S7A  — full GTR (20 free rates, 6 free freqs)              *
- *     RNA7B / S7B  — full GTR rates, strand-sym freqs (20+3)             *
- *     RNA7C / S7C  — 10 rate classes, some forbidden (9+6)               *
- *     RNA7D / S7D  — 4 rate classes (3+6)                                *
- *     RNA7E / S7E  — 2 rate classes, some forbidden (1+6)                *
- *     RNA7F / S7F  — 4 rate classes, strand-sym freqs (3+3)              *
+ *     RNA7A / S7A  — full GTR (20 free rates, 6 free freqs)               *
+ *     RNA7B / S7B  — full GTR rates, strand-sym freqs (20+3)              *
+ *     RNA7C / S7C  — 10 rate classes, some forbidden (9+6)                *
+ *     RNA7D / S7D  — 4 rate classes (3+6)                                 *
+ *     RNA7E / S7E  — 2 rate classes, some forbidden (1+6)                 *
+ *     RNA7F / S7F  — 4 rate classes, strand-sym freqs (3+3)               *
  *                                                                         *
  *   RNA7 symmetry vectors and frequency groupings are taken directly      *
- *   from the RAxML source (models.c, SEC_7_A through SEC_7_F).           *
+ *   from the RAxML source (models.c, SEC_7_A through SEC_7_F).            *
  ***************************************************************************/
 
 #include "modelrna.h"
@@ -986,6 +986,18 @@ void ModelRNA::computeTipLikelihood(PML::StateType state, double *state_lk) {
         if ((int)state < num_states) {
             memset(state_lk, 0, num_states * sizeof(double));
             state_lk[state] = 1.0;
+        } else if (isRNA6()) {
+            // RNA6 partial-mismatch coding (RAxML / PHASE-manual): a stem
+            // mismatch is a partial ambiguity over the compatible canonical
+            // states, encoded (in Alignment::convertDoubletToRNA6) with the
+            // same bitmask convention as DNA ambiguity:
+            //   observed code = (num_states-1) + bitmask-over-states.
+            // STATE_UNKNOWN's bitmask is all-ones, so a true gap still yields
+            // a full gap (all 1s).
+            memset(state_lk, 0, num_states * sizeof(double));
+            int cstate = (int)state - num_states + 1;
+            for (int i = 0; i < num_states; i++)
+                if (cstate & (1 << i)) state_lk[i] = 1.0;
         } else {
             ModelMarkov::computeTipLikelihood(state, state_lk);
         }
@@ -1014,10 +1026,18 @@ void ModelRNA::computeTipLikelihood(PML::StateType state, double *state_lk) {
         for (int k = 0; k < 10; k++)
             state_lk[mismatch_doublets[k]] = 1.0;
     } else if (isRNA6()) {
-        // RNA6 expanded: mismatch doublet -> completely uninformative (gap)
-        // (RNA6 has no mismatch state at all)
-        for (int i = 0; i < 16; i++)
-            state_lk[i] = 1.0;
+        // RNA6 expanded: mismatch doublet -> partial ambiguity over the
+        // compatible canonical doublets (RAxML / PHASE-manual coding), written
+        // into 16-state doublet indices.  Canonical doublet c is ON iff its
+        // 1st base matches the mismatch's 1st base OR its 2nd matches the 2nd.
+        //   e.g. AA -> {AU,UA}, GG -> {CG,GC,GU,UG}
+        memset(state_lk, 0, 16 * sizeof(double));
+        int db1 = base1(state), db2 = base2(state);
+        for (int i = 0; i < 6; i++) {
+            int c = rna6_to_doublet[i];
+            if (base1(c) == db1 || base2(c) == db2)
+                state_lk[c] = 1.0;
+        }
     }
 }
 
