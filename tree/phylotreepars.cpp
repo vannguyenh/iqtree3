@@ -151,6 +151,17 @@ void PhyloTree::computePartialParsimonyFast(PhyloNeighbor *dad_branch, PhyloNode
                             for (int i = 0; i < (*alnit)->num_states; i++)
                                     p[i] |= bit1;
                         }
+                    } else if ((*alnit)->seq_type == SEQ_DOUBLET) {
+                        // RNA6 partial-mismatch ambiguity code: bitmask over
+                        // states = state - num_states + 1 (DNA-style convention).
+                        for (int j = 0; j < freq; j++, site++) {
+                            UINT *p = dad_branch->partial_pars+((site/UINT_BITS)*nstates);
+                            UINT bit1 = (1 << (site%UINT_BITS));
+                            int cstate = state - (*alnit)->num_states + 1;
+                            for (int i = 0; i < (*alnit)->num_states; i++)
+                                if (cstate & (1 << i))
+                                    p[i] |= bit1;
+                        }
                     } else {
                         ASSERT(0);
                     }
