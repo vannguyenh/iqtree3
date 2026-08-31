@@ -1635,7 +1635,10 @@ void parseArg(int argc, char *argv[], Params &params) {
     for (cnt = 1; cnt < argc; cnt++) {
         params.original_params = params.original_params + argv[cnt] + " ";
     }
-    
+    // whether the user explicitly chose an edge-linkage mode (--edge or -M);
+    // used below to give --rna-structure the RAxML-matching default
+    bool edge_specified = false;
+
     for (cnt = 1; cnt < argc; cnt++) {
         try {
 
@@ -2642,6 +2645,7 @@ void parseArg(int argc, char *argv[], Params &params) {
 			}
 			if (strcmp(argv[cnt], "-M") == 0) {
                 params.partition_type = BRLEN_OPTIMIZE;
+                edge_specified = true;
                 continue;
             }
 
@@ -2669,6 +2673,7 @@ void parseArg(int argc, char *argv[], Params &params) {
                     params.partition_type = BRLEN_OPTIMIZE;
                 else
                     throw "Use --edge equal|scale|unlink";
+                edge_specified = true;
                 continue;
             }
             
@@ -6020,6 +6025,15 @@ void parseArg(int argc, char *argv[], Params &params) {
         }
 
     } // for
+
+    // RNA secondary-structure models default to the RAxML behaviour:
+    // edge-linked proportional branch lengths (--edge scale). An explicit
+    // --edge or -M, or a partition option that already set a linkage
+    // (-p/-spp/-q/-spu), still wins.
+    if (params.rna_structure_file && !edge_specified &&
+        params.partition_type == BRLEN_OPTIMIZE)
+        params.partition_type = BRLEN_SCALE;
+
     if (!params.user_file && !params.aln_file && !params.ngs_file && !params.ngs_mapped_reads && !params.partition_file && !params.alisim_active) {
 #ifdef IQ_TREE
         quickStartGuide();
