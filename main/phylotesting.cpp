@@ -493,6 +493,8 @@ bool mixRevNonrev(StrVector model_names, SeqType seq_type) {
     return (hasRevModel && hasNonRevModel);
 }
 
+static bool isDoubletModelName(string name);
+
 int detectSeqType(const char *model_name, SeqType &seq_type) {
     bool empirical_model = false;
     int i;
@@ -501,6 +503,14 @@ int detectSeqType(const char *model_name, SeqType &seq_type) {
     StrVector model_list;
 
     seq_type = SEQ_UNKNOWN;
+
+    // RNA doublet models (S16/S7*/S6*, and the RNA16/RNA7*/RNA6* aliases).
+    // Checked first: their names do not collide with any other model list, and
+    // AliSim needs the type resolved from the model name alone.
+    if (isDoubletModelName(model_str)) {
+        seq_type = SEQ_DOUBLET;
+        return 1;
+    }
 
     copyCString(bin_model_names, sizeof(bin_model_names)/sizeof(char*), model_list, true);
     for (i = 0; i < model_list.size(); i++)
@@ -631,6 +641,7 @@ string convertSeqTypeToSeqTypeName(SeqType seq_type)
         case SEQ_PROTEIN: return "AA"; break;
         case SEQ_CODON: return "CODON"; break;
         case SEQ_GENOTYPE: return "GT"; break;
+        case SEQ_DOUBLET: return "DOUBLET"; break;
         default: break;
     }
     return "";
@@ -1240,11 +1251,15 @@ void getModelSubst(SeqType seq_type, bool standard_code, string model_name,
             convert_string_vec(model_set.c_str(), model_names);
         }
     } else if (seq_type == SEQ_DOUBLET) {
-        // RNA doublet models: test all 14 models across 16-, 7-, and 6-state spaces.
-        // All models are evaluated on the same 16-state alignment using
-        // ambiguity coding (Douglas's approach): RNA7/RNA6 models expand
-        // their rate matrix to 16x16 and encode mismatch tips as ambiguous.
-        if (model_set.empty()) {
+        // RNA doublet models: test all 14 models across 16-, 7- and 6-state spaces.
+        // Every model is scored on the same 16-state alignment: RNA7/RNA6 expand
+        // their rate matrix to 16x16 and the tip vector is one-hot at the observed
+        // doublet, so all candidates give the probability of exactly the same event.
+        // "RNA" and "S" are shorthand for the full list, so users can write
+        //   --mset "GTR/RNA"   instead of  --mset "GTR/S16,S16A,...,S6E"
+        if (iEquals(model_set, "RNA") || iEquals(model_set, "S")) {
+            copyCString(rna_model_names, sizeof(rna_model_names) / sizeof(char*), model_names);
+        } else if (model_set.empty()) {
             copyCString(rna_model_names, sizeof(rna_model_names) / sizeof(char*), model_names);
         } else if (model_set[0] == '+') {
             convert_string_vec(model_set.c_str()+1, model_names);
@@ -1354,6 +1369,11 @@ void getRateHet(SeqType seq_type, string model_name, double frac_invariant_sites
     bool test_options_asc_new[]   = {false, false,  true, false, false,    true, false,   true, false};
     bool test_options_pomo[]      = {true,  false, false,  true, false,   false, false,  false, false};
     bool test_options_norate[]    = {true,  false, false, false, false,   false, false,  false, false};
+    // RNA doublet models: +G only. The collapsed 6-state models embed the ten
+    // mismatch doublets with zero exchangeability, so a site containing a mismatch
+    // has an exactly zero likelihood; +I has to divide by that and aborts in
+    // RateGammaInvar::optimizeWithEM. Four categories is also the convention.
+    bool test_options_doublet[]   = {false, false, false,  true, false,   false, false,  false, false};
     bool *test_options = test_options_default;
     //    bool test_options_codon[] =  {true,false,  false,false,  false,    false};
     const int noptions = sizeof(rate_options) / sizeof(char*);
@@ -1362,7 +1382,10 @@ void getRateHet(SeqType seq_type, string model_name, double frac_invariant_sites
     bool with_new = (model_name.find("NEW") != string::npos || model_name.substr(0,2) == "MF" || model_name.empty());
     bool with_asc = model_name.find("ASC") != string::npos;
 
-    if (seq_type == SEQ_POMO) {
+    if (seq_type == SEQ_DOUBLET) {
+        test_options = test_options_doublet;
+    }
+    else if (seq_type == SEQ_POMO) {
         for (i = 0; i < noptions; i++)
             test_options[i] = test_options_pomo[i];
     }
