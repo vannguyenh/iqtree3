@@ -2364,6 +2364,16 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
             }
             cout << "Alignment most likely contains genotype matrix" << endl;
             break;
+        case SEQ_DOUBLET:
+            if (params.model_name.find("RNA6") != string::npos) {
+                num_states = 6;
+            } else if (params.model_name.find("RNA7") != string::npos) {
+                num_states = 7;
+            } else {
+                num_states = 16;
+            }
+            cout << "Alignment most likely contains RNA secondary-structure data" << endl;
+            break;
     default:
         if (!sequence_type) {
             throw "Unknown sequence type.";
@@ -2385,6 +2395,18 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
                 num_states = 16;
             }
             user_seq_type = SEQ_GENOTYPE;
+        } else if (strcmp(sequence_type, "DOUBLET") == 0) {
+            // RNA secondary-structure models: the state is a base PAIR, so the
+            // alphabet is the 16 doublets AA, AC, ... UU. Needed by AliSim, which
+            // has no alignment to infer the state count from.
+            if (params.model_name.find("RNA6") != string::npos) {
+                num_states = 6;
+            } else if (params.model_name.find("RNA7") != string::npos) {
+                num_states = 7;
+            } else {
+                num_states = 16;
+            }
+            user_seq_type = SEQ_DOUBLET;
         } else if (strcmp(sequence_type, "AA") == 0 || strcmp(sequence_type, "PROT") == 0) {
             num_states = 20;
             user_seq_type = SEQ_PROTEIN;
