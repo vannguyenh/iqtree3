@@ -1009,50 +1009,36 @@ static bool isDoubletModelName(string name) {
 }
 
 /**
- * Resolve the global -mset value for one partition of an --rna-structure
- * analysis, which mixes DNA (loop) and doublet (stem) partitions.
+ * Resolve the model set for one partition of an --rna-structure analysis,
+ * which mixes DNA (loops) and doublet (stems) partitions.
  *
- * Mirrors the -m <loop_model>/<stem_model> syntax:
- *   "JC,HKY/S6A,S7A"  loops get "JC,HKY", stems get "S6A,S7A"
- *   "S6A,S7A"         stems get "S6A,S7A"; loops fall back to their default
- *   "GTR,HKY"         loops get "GTR,HKY"; stems fall back to their default
+ * The two partitions have separate options and never interact:
+ *   --mset       candidates for the loops, non-RNA models only
+ *   --mset-rna   candidates for the stems, RNA doublet models only
  *
- * Without this, the single global -mset reaches both partitions: an RNA name
- * makes the DNA partition treat it as a user-defined model file, and a DNA
- * name silently collapses the stems to the default S16.
+ * A bare --mset-rna means "all 14 doublet models".  Selection on the stems is
+ * opt-in: getModelSubst() raises an error if --mset-rna is absent, rather than
+ * silently falling back to a default the user never asked for.
  *
  * @return the model set for this data type; "" means "use its built-in default".
  */
 static string resolveModelSetForSeqType(string model_set, SeqType seq_type) {
-    if (model_set.empty())
-        return model_set;
+    if (seq_type == SEQ_DOUBLET)
+        return Params::getInstance().model_set_rna;
 
-    // Explicit <loop_set>/<stem_set> split
-    size_t slash = model_set.find('/');
-    if (slash != string::npos)
-        return (seq_type == SEQ_DOUBLET) ? model_set.substr(slash + 1)
-                                         : model_set.substr(0, slash);
-
-    // No slash: keep only the entries belonging to this partition's data type.
-    // A leading '+' (the append-to-defaults form) is preserved.
-    string prefix;
-    if (model_set[0] == '+') {
-        prefix = "+";
-        model_set = model_set.substr(1);
+    // Loops: a doublet name here is a mistake.  Reject it rather than let the
+    // DNA partition treat "S6A" as the name of a user-supplied model file.
+    string bare = (!model_set.empty() && model_set[0] == '+')
+                  ? model_set.substr(1) : model_set;
+    if (!bare.empty()) {
+        StrVector names;
+        convert_string_vec(bare.c_str(), names);
+        for (auto &name : names)
+            if (isDoubletModelName(name))
+                outError("RNA doublet model " + name + " was given to --mset; "
+                         "use --mset-rna for the stems partition");
     }
-    StrVector names;
-    convert_string_vec(model_set.c_str(), names);
-    string kept;
-    for (auto &name : names) {
-        if ((seq_type == SEQ_DOUBLET) == isDoubletModelName(name)) {
-            if (!kept.empty())
-                kept += ",";
-            kept += name;
-        }
-    }
-    if (kept.empty())
-        return "";   // nothing for this data type: fall back to its default
-    return prefix + kept;
+    return model_set;
 }
 
 /**
@@ -1251,15 +1237,18 @@ void getModelSubst(SeqType seq_type, bool standard_code, string model_name,
             convert_string_vec(model_set.c_str(), model_names);
         }
     } else if (seq_type == SEQ_DOUBLET) {
-        // RNA doublet models: test all 14 models across 16-, 7- and 6-state spaces.
-        // Every model is scored on the same 16-state alignment: RNA7/RNA6 expand
-        // their rate matrix to 16x16 and the tip vector is one-hot at the observed
-        // doublet, so all candidates give the probability of exactly the same event.
-        // "RNA" and "S" are shorthand for the full list, so users can write
-        //   --mset "GTR/RNA"   instead of  --mset "GTR/S16,S16A,...,S6E"
-        if (iEquals(model_set, "RNA") || iEquals(model_set, "S")) {
-            copyCString(rna_model_names, sizeof(rna_model_names) / sizeof(char*), model_names);
-        } else if (model_set.empty()) {
+        // RNA doublet models are chosen only through --mset-rna, so the loops
+        // and stems partitions never contend for the same option.  Every
+        // candidate is scored on the same 16-state alignment: RNA7/RNA6 expand
+        // their rate matrix to 16x16 and the tip vector is one-hot at the
+        // observed doublet, so all candidates give the probability of exactly
+        // the same event, which is what makes their BIC comparable.
+        if (Params::getInstance().rna_structure_file &&
+            !Params::getInstance().model_set_rna_given)
+            outError("RNA doublet model selection needs --mset-rna\n"
+                     "       --mset-rna             test all 14 doublet models\n"
+                     "       --mset-rna S16,S7A     test only the models listed");
+        if (model_set.empty()) {
             copyCString(rna_model_names, sizeof(rna_model_names) / sizeof(char*), model_names);
         } else if (model_set[0] == '+') {
             convert_string_vec(model_set.c_str()+1, model_names);

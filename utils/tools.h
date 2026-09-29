@@ -1628,6 +1628,13 @@ public:
     /** set of models for testing */
     string model_set;
 
+    /** set of RNA doublet models for the stems partition (--mset-rna).
+        Empty while model_set_rna_given is true means "all 14 models". */
+    string model_set_rna;
+
+    /** true if --mset-rna was given on the command line */
+    bool model_set_rna_given;
+
     /** set of models to be added into default set */
     char *model_extra_set;
 
