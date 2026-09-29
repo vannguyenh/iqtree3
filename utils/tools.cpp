@@ -1255,6 +1255,8 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.model_name_init = NULL;
     params.model_opt_steps = 10;
     params.model_set = "ALL";
+    params.model_set_rna = "";
+    params.model_set_rna_given = false;
     params.model_extra_set = NULL;
     params.model_subset = NULL;
     params.state_freq_set = NULL;
@@ -3456,6 +3458,16 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.contain_nonrev = true;
                 continue;
             }
+			if (strcmp(argv[cnt], "-mset-rna") == 0 || strcmp(argv[cnt], "--mset-rna") == 0) {
+				// Candidates for the stems (paired) partition.  The list is
+				// optional: a bare --mset-rna means all 14 doublet models.
+				params.model_set_rna_given = true;
+				if (cnt + 1 < argc && argv[cnt+1][0] != '-') {
+					cnt++;
+					params.model_set_rna = argv[cnt];
+				}
+				continue;
+			}
 			if (strcmp(argv[cnt], "-mset") == 0 || strcmp(argv[cnt], "--mset") == 0 || strcmp(argv[cnt], "--models") == 0 || strcmp(argv[cnt], "-mexchange") == 0 || strcmp(argv[cnt], "--mexchange") == 0 ) {
 				cnt++;
 				if (cnt >= argc)
@@ -6030,9 +6042,27 @@ void parseArg(int argc, char *argv[], Params &params) {
     // edge-linked proportional branch lengths (--edge scale). An explicit
     // --edge or -M, or a partition option that already set a linkage
     // (-p/-spp/-q/-spu), still wins.
-    if (params.rna_structure_file && !edge_specified &&
-        params.partition_type == BRLEN_OPTIMIZE)
-        params.partition_type = BRLEN_SCALE;
+    //
+    // Model selection is the exception.  Under BRLEN_SCALE the only correction
+    // available after a candidate model is installed is one global scale factor
+    // for the whole tree (see model/partitionmodelplen.cpp, which calls
+    // optimizeTreeLengthScaling instead of optimizeAllBranches), and that cannot
+    // recover the likelihood the new model needs.  Selection then aborts on
+    // "individual model opt reduces LnL", so use unlinked branches there.
+    if (params.rna_structure_file) {
+        bool model_finder = params.model_name.empty() ||
+                            params.model_name.substr(0, 4) == "TEST" ||
+                            params.model_name.substr(0, 2) == "MF";
+        if (model_finder) {
+            if (params.partition_type != BRLEN_OPTIMIZE) {
+                outWarning("model selection requires unlinked branch lengths; "
+                           "using --edge unlink for this run");
+                params.partition_type = BRLEN_OPTIMIZE;
+            }
+        } else if (!edge_specified && params.partition_type == BRLEN_OPTIMIZE) {
+            params.partition_type = BRLEN_SCALE;
+        }
+    }
 
     if (!params.user_file && !params.aln_file && !params.ngs_file && !params.ngs_mapped_reads && !params.partition_file && !params.alisim_active) {
 #ifdef IQ_TREE
@@ -7724,6 +7754,8 @@ void Params::setDefault() {
     model_name_init = nullptr;
     model_opt_steps = 10;
     model_set = "ALL";
+    model_set_rna = "";
+    model_set_rna_given = false;
     model_extra_set = nullptr;
     model_subset = nullptr;
     state_freq_set = nullptr;
