@@ -160,6 +160,29 @@ public:
     virtual int getNDim();
     virtual int getNDimFreq();
 
+    /**
+     * Optimisation target.
+     *
+     * In expanded mode the ten mismatch doublets of an RNA6 model deliberately
+     * carry a near-zero frequency (MIN_RATE, about 1e-4 after renormalising).
+     * ModelMarkov::targetFunk() treats any frequency below min_state_freq as a
+     * numerical error and returns 1e30, so every trial point scored the same
+     * and the optimiser could never move the rates.  Here only genuinely
+     * invalid (negative) frequencies are rejected.
+     */
+    virtual double targetFunk(double x[]);
+
+    /**
+     * Optimiser bounds.
+     *
+     * ModelMarkov::setBounds() sizes the frequency block with num_states,
+     * which is 16 in expanded mode, while getNDim() reports the NATIVE
+     * dimensions. That mismatch writes past the end of the bound arrays and
+     * corrupts the optimiser, which then reduces the likelihood and trips the
+     * assertion in PartitionModelPlen. Size everything natively here.
+     */
+    virtual void setBounds(double *lower_bound, double *upper_bound, bool *bound_check);
+
 private:
     RNAModelVariant variant;
     string rna_model_name;
@@ -174,6 +197,41 @@ private:
      *  Set during init() expansion. */
     int native_num_rate_params = 0;
     int native_num_freq_params = 0;
+
+    /** In expanded mode the native (7- or 6-state) model is kept alive so the
+     *  optimiser can actually fit it.  Optimisation happens on this native
+     *  model and the result is re-expanded into the 16-state matrix; without
+     *  it the collapsed models were scored at their unfitted 1.0 start values
+     *  and every variant of a family returned the same likelihood. */
+    int          native_states       = 0;
+    double      *native_rates_arr    = nullptr;   // native nrates entries
+    double      *native_freq_arr     = nullptr;   // native_states entries
+    string       native_param_spec;
+    vector<bool> native_param_fixed;
+    int          native_num_params   = 0;
+    vector<int>  native_free_indices;
+
+    /** Scratch for pushNativeView()/popNativeView(). */
+    int          saved16_num_states  = 0;
+    double      *saved16_rates       = nullptr;
+    double      *saved16_freq        = nullptr;
+    string       saved16_param_spec;
+    vector<bool> saved16_param_fixed;
+    int          saved16_num_params  = 0;
+    vector<int>  saved16_free_indices;
+
+    /** Temporarily present the native model to the parameter-packing code,
+     *  then restore the 16-state view. */
+    void pushNativeView();
+    void popNativeView();
+
+    /** Rebuild the 16-state rates and frequencies from the native model.
+     *  Called whenever the optimiser changes the native parameters. */
+    void syncExpandedFromNative();
+
+    /** Bodies of setVariables/getVariables, run under whichever view is installed. */
+    void setVariablesImpl(double *variables);
+    bool getVariablesImpl(double *variables);
 
     /** @return true if this is an RNA7 family variant. */
     bool isRNA7() const { return variant >= RNA7A && variant <= RNA7F; }

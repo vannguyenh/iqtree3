@@ -387,7 +387,11 @@ ModelRNA::ModelRNA(const char *model_name, string model_params,
     init(model_name, model_params, freq_type, freq_params);
 }
 
-ModelRNA::~ModelRNA() {}
+ModelRNA::~ModelRNA() {
+    // Owned only in expanded mode; null otherwise.
+    delete[] native_rates_arr;
+    delete[] native_freq_arr;
+}
 
 // -----------------------------------------------------------------------
 // applySymmetryVector
@@ -599,7 +603,136 @@ void ModelRNA::applySymmetryVector() {
 // ModelDNA's setVariables/getVariables handle via the freq_type branch.
 // -----------------------------------------------------------------------
 
+// -----------------------------------------------------------------------
+// Expanded-mode optimisation support.
+//
+// In expanded mode the model presents a 16x16 matrix to the likelihood
+// engine, but its free parameters live in the native 7- or 6-state model.
+// pushNativeView() installs the native model so the ordinary packing code
+// (which is written against num_states / rates / param_spec) operates on it;
+// popNativeView() puts the 16-state view back.  syncExpandedFromNative()
+// then rebuilds the 16x16 matrix from the freshly fitted native parameters.
+// -----------------------------------------------------------------------
+
+void ModelRNA::setBounds(double *lower_bound, double *upper_bound, bool *bound_check) {
+    if (!expanded_mode) {
+        ModelMarkov::setBounds(lower_bound, upper_bound, bound_check);
+        return;
+    }
+    // In expanded mode the free parameters live in the native 7- or 6-state
+    // model, so the bounds must be sized from native_states, not num_states.
+    int ndim = getNDim();
+    for (int i = 1; i <= ndim; i++) {
+        lower_bound[i] = MIN_RATE;
+        upper_bound[i] = MAX_RATE;
+        bound_check[i] = false;
+    }
+    if (is_reversible && freq_type == FREQ_ESTIMATE) {
+        for (int i = native_num_rate_params + 1;
+             i <= native_num_rate_params + native_states - 1 && i <= ndim; i++) {
+            lower_bound[i] = Params::getInstance().min_state_freq;
+            upper_bound[i] = 1.0;
+            bound_check[i] = false;
+        }
+    }
+}
+
+double ModelRNA::targetFunk(double x[]) {
+    if (!expanded_mode)
+        return ModelMarkov::targetFunk(x);
+
+    bool changed = getVariables(x);
+    if (changed) {
+        decomposeRateMatrix();
+        ASSERT(phylo_tree);
+        phylo_tree->clearAllPartialLH();
+    }
+
+    // Expanded RNA6 gives the ten mismatch doublets a deliberately near-zero
+    // frequency, which the base-class guard rejects as a numerical error.  That
+    // made every candidate point return 1e30, so the optimiser saw a flat
+    // surface and the rates never left their 1.0 starting values.  Only reject
+    // genuinely invalid (negative) frequencies here.
+    for (int i = 0; i < num_states; i++)
+        if (state_freq[i] < 0)
+            return 1.0e+30;
+
+    return -phylo_tree->computeLikelihood();
+}
+
+void ModelRNA::pushNativeView() {
+    saved16_num_states   = num_states;
+    saved16_rates        = rates;
+    saved16_freq         = state_freq;
+    saved16_param_spec   = param_spec;
+    saved16_param_fixed  = param_fixed;
+    saved16_num_params   = num_params;
+    saved16_free_indices = rna_free_indices;
+
+    num_states       = native_states;
+    rates            = native_rates_arr;
+    state_freq       = native_freq_arr;
+    param_spec       = native_param_spec;
+    param_fixed      = native_param_fixed;
+    num_params       = native_num_params;
+    rna_free_indices = native_free_indices;
+}
+
+void ModelRNA::popNativeView() {
+    num_states       = saved16_num_states;
+    rates            = saved16_rates;
+    state_freq       = saved16_freq;
+    param_spec       = saved16_param_spec;
+    param_fixed      = saved16_param_fixed;
+    num_params       = saved16_num_params;
+    rna_free_indices = saved16_free_indices;
+}
+
+void ModelRNA::syncExpandedFromNative() {
+    double expanded_rates[120];
+    double expanded_freqs[16];
+    pushNativeView();
+    expandToDoubletSpace(expanded_rates, expanded_freqs);
+    popNativeView();
+    memcpy(rates, expanded_rates, 120 * sizeof(double));
+    memcpy(state_freq, expanded_freqs, 16 * sizeof(double));
+}
+
 void ModelRNA::setVariables(double *variables) {
+    if (!expanded_mode) {
+        setVariablesImpl(variables);
+        return;
+    }
+    // Pack the native model's free parameters.
+    pushNativeView();
+    setVariablesImpl(variables);
+    popNativeView();
+}
+
+bool ModelRNA::getVariables(double *variables) {
+    if (!expanded_mode)
+        return getVariablesImpl(variables);
+
+    // Unpack into the native model (rates/state_freq point straight at the
+    // persisted native arrays here, so the writes land in them), then rebuild
+    // the 16-state matrix the likelihood is actually computed from.
+    pushNativeView();
+    bool changed = getVariablesImpl(variables);
+    popNativeView();
+    if (changed) {
+        syncExpandedFromNative();
+        // Callers other than targetFunk() (notably the final unpack at the end
+        // of ModelMarkov::optimizeParameters) do not re-decompose afterwards.
+        // Without this the eigendecomposition would lag the rebuilt matrix and
+        // the reported likelihood would not match the parameters, which trips
+        // the "individual model opt reduces LnL" assertion under --edge scale.
+        decomposeRateMatrix();
+        if (phylo_tree) phylo_tree->clearAllPartialLH();
+    }
+    return changed;
+}
+
+void ModelRNA::setVariablesImpl(double *variables) {
     if (!isFullGTR()) {
         ModelDNA::setVariables(variables);
         return;
@@ -612,7 +745,7 @@ void ModelRNA::setVariables(double *variables) {
     ModelDNA::setVariables(variables);
 }
 
-bool ModelRNA::getVariables(double *variables) {
+bool ModelRNA::getVariablesImpl(double *variables) {
     if (!isFullGTR()) {
         return ModelDNA::getVariables(variables);
     }
@@ -782,6 +915,40 @@ void ModelRNA::init(const char *model_name, string model_params,
                 native_freqs[i] /= sum;
         }
 
+        // Strand-symmetric variants (RNA7B, RNA7F, RNA6C, RNA6D) constrain
+        // frequencies by grouping: pi_XY = pi_YX, which is what removes their
+        // three (or two) frequency parameters.  Normal mode applies this in
+        // initDoubletFrequencies(), but the expanded path builds native_freqs
+        // inline and never calls it, so the constraint has to be applied here
+        // or the model computes its unconstrained parent while still being
+        // charged the reduced parameter count.
+        if (variant == RNA7B || variant == RNA7F ||
+            variant == RNA6C || variant == RNA6D) {
+            int freq_group[7];
+            int sym_vec_dummy[21];
+            if (isRNA7())
+                getRNA7SymmetrySpec(sym_vec_dummy, freq_group);
+            else
+                getRNA6SymmetrySpec(sym_vec_dummy, freq_group);
+            int max_group = 0;
+            for (int i = 0; i < native_states; i++)
+                if (freq_group[i] > max_group) max_group = freq_group[i];
+            for (int g = 0; g <= max_group; g++) {
+                double avg = 0.0;
+                int count = 0;
+                for (int i = 0; i < native_states; i++)
+                    if (freq_group[i] == g) { avg += native_freqs[i]; count++; }
+                if (count > 0) {
+                    avg /= count;
+                    for (int i = 0; i < native_states; i++)
+                        if (freq_group[i] == g) native_freqs[i] = avg;
+                }
+            }
+            double gsum = 0.0;
+            for (int i = 0; i < native_states; i++) gsum += native_freqs[i];
+            for (int i = 0; i < native_states; i++) native_freqs[i] /= gsum;
+        }
+
         // Save and install native state_freq
         double *saved_state_freq = state_freq;
         state_freq = native_freqs;
@@ -798,17 +965,28 @@ void ModelRNA::init(const char *model_name, string model_params,
         // Step 4: restore num_states = 16 and install expanded arrays
         num_states = saved_num_states;  // back to 16
 
-        // Free native arrays and restore/replace with expanded
-        delete[] native_rates;
+        // Keep the native model alive: the optimiser fits it and the result is
+        // re-expanded (see setVariables/getVariables/syncExpandedFromNative).
+        // Previously these were deleted and param_spec was cleared, which left
+        // the collapsed models with no optimiser mapping at all, so their rates
+        // never moved off the 1.0 start and every variant of a family returned
+        // an identical likelihood.
+        this->native_states       = native_states;
+        this->native_rates_arr    = native_rates;   // take ownership
+        this->native_freq_arr     = native_freqs;   // take ownership
+        this->native_param_spec   = param_spec;
+        this->native_param_fixed  = param_fixed;
+        this->native_num_params   = num_params;
+        this->native_free_indices = rna_free_indices;
+
         rates = saved_rates;  // restore original 16-state rates pointer
         memcpy(rates, expanded_rates, 120 * sizeof(double));
 
-        delete[] native_freqs;
         state_freq = saved_state_freq;  // restore original 16-state state_freq pointer
         memcpy(state_freq, expanded_freqs, 16 * sizeof(double));
 
-        // Clear param_spec — expanded model has no rate constraints
-        // (the constraints are baked into the expanded rate values)
+        // The 16-state view carries no direct rate constraints: the constraints
+        // live in the native model, which is what the optimiser now drives.
         param_spec.clear();
         param_fixed.clear();
 
@@ -1005,55 +1183,83 @@ void ModelRNA::computeTipLikelihood(PML::StateType state, double *state_lk) {
     }
 
     // --- Expanded mode: model selection in 16-state doublet space ---
-    // num_states is 16 (the expanded space).
-    // The observed state is a doublet index (0-15).
-
+    //
+    // The doublet is OBSERVED EXACTLY, so the tip vector is one-hot at the
+    // observed state for every model. Ambiguity coding would be appropriate
+    // only in the reverse situation, where the data are the aggregated states
+    // and the model lives in the finer space (as for amino-acid data under a
+    // codon model, where one sums over the codons coding for the observed
+    // amino acid). Here the data are the fine states, so there is nothing to
+    // sum over: a mismatch observation is a mismatch observation.
+    //
+    // The collapsed structure belongs in the rate matrix and the frequencies,
+    // not in the tip encoding. With one-hot tips the embedding is properly
+    // nested: S7 is S16 with the ten mismatch states constrained to share
+    // parameters, and S6 is S16 with those states given (near) no mass. Both
+    // are then genuine submodels of S16 scored on identical data, which is
+    // what makes the likelihoods, and therefore BIC, comparable.
     if ((int)state >= 16) {
-        // Unknown / gap: all states equally likely
+        // Unknown / gap: uninformative
         for (int i = 0; i < 16; i++)
             state_lk[i] = 1.0;
         return;
     }
+    memset(state_lk, 0, 16 * sizeof(double));
 
-    if (isCanonical(state)) {
-        // Canonical pair (AU, CG, GC, GU, UA, UG): unambiguous in all models
-        memset(state_lk, 0, 16 * sizeof(double));
+    // Which doublets does the observation correspond to, in THIS model's state
+    // space?  A canonical pair is one state in every model, so it is one-hot
+    // throughout.  A mismatch is where the three spaces differ:
+    //
+    //   S16  it has its own state              -> one-hot at the doublet
+    //   S7   the ten mismatches are one MM     -> 1 at all ten mismatch doublets
+    //   S6   no mismatch state exists at all   -> 1 at the canonical pairs that
+    //        share a base with it (AC gives AU and GC), the same partial
+    //        ambiguity the native 6-state run uses in convertDoubletToRNA6
+    bool canonical = false;
+    for (int k = 0; k < 6; k++)
+        if (rna6_to_doublet[k] == (int)state) { canonical = true; break; }
+
+    if (canonical || !isCollapsed()) {
         state_lk[state] = 1.0;
     } else if (isRNA7()) {
-        // RNA7 expanded: mismatch doublet -> ambiguous over all 10 mismatches
-        // (the observation tells us it's MM, but not which mismatch)
-        memset(state_lk, 0, 16 * sizeof(double));
         for (int k = 0; k < 10; k++)
             state_lk[mismatch_doublets[k]] = 1.0;
-    } else if (isRNA6()) {
-        // RNA6 expanded: mismatch doublet -> partial ambiguity over the
-        // compatible canonical doublets (RAxML / PHASE-manual coding), written
-        // into 16-state doublet indices.  Canonical doublet c is ON iff its
-        // 1st base matches the mismatch's 1st base OR its 2nd matches the 2nd.
-        //   e.g. AA -> {AU,UA}, GG -> {CG,GC,GU,UG}
-        memset(state_lk, 0, 16 * sizeof(double));
-        int db1 = base1(state), db2 = base2(state);
-        for (int i = 0; i < 6; i++) {
-            int c = rna6_to_doublet[i];
-            if (base1(c) == db1 || base2(c) == db2)
+    } else {   // isRNA6()
+        int b1 = (int)state / 4, b2 = (int)state % 4;
+        for (int k = 0; k < 6; k++) {
+            int c = rna6_to_doublet[k];
+            if (c / 4 == b1 || c % 4 == b2)
                 state_lk[c] = 1.0;
         }
     }
 }
+
 
 // -----------------------------------------------------------------------
 // getNDim — correct parameter count for AIC/BIC
 // -----------------------------------------------------------------------
 
 int ModelRNA::getNDim() {
-    if (expanded_mode)
-        return native_num_rate_params;
+    if (expanded_mode) {
+        // Mirror ModelMarkov::getNDim() but in the native state space: the
+        // optimiser needs one variable per free native rate, plus the free
+        // frequencies when they are estimated rather than empirical.
+        // Total degrees of freedom (getNDim + getNDimFreq) are unchanged.
+        int ndim = native_num_rate_params;
+        if (freq_type == FREQ_ESTIMATE)
+            ndim += native_states - 1;
+        return ndim;
+    }
     return ModelDNA::getNDim();
 }
 
 int ModelRNA::getNDimFreq() {
-    if (expanded_mode)
+    if (expanded_mode) {
+        // FREQ_ESTIMATE frequencies are already counted inside getNDim().
+        if (freq_type == FREQ_ESTIMATE)
+            return 0;
         return native_num_freq_params;
+    }
 
     // Normal mode: strand-symmetric variants have fewer free freqs
     // than num_states-1 because some frequencies are constrained equal.
