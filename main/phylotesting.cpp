@@ -68,10 +68,31 @@ const char* genotype_model_names[] = {"GT10", "GT16"};
 //const char* morph_model_names[] = {"MK", "ORDERED"};
 const char* morph_model_names[] = {"MK"};
 
-/******* RNA doublet model set (all three state spaces) ******/
+/******* RNA doublet model names (all three state spaces).
+ * This list is for RECOGNISING doublet names in user input (any option);
+ * it is not the ModelFinder candidate list. ******/
 const char* rna_model_names[] = {
     "S16", "S16A", "S16B",
     "S7A", "S7B", "S7C", "S7D", "S7E", "S7F",
+    "S6A", "S6B", "S6C", "S6D", "S6E"
+};
+
+/******* ModelFinder candidates for the stems partition: the 16- and
+ * 7-state models only.  The 6-state models have no state for a mismatch
+ * pair, so they cannot answer the shared 16-state question (the
+ * probability of the exact observed pair) and are NEVER expanded to the
+ * doublet space; ModelRNA::init() enforces this.  Instead they get their
+ * own, separate selection (below). ******/
+const char* rna_candidate_model_names[] = {
+    "S16", "S16A", "S16B",
+    "S7A", "S7B", "S7C", "S7D", "S7E", "S7F"
+};
+
+/******* The 6-state family: selected only among themselves, on the native
+ * 6-state encoding, where all five answer the same question (the
+ * "ignoring mismatches" selection).  Their scores are never compared
+ * with the 16- and 7-state selection. ******/
+const char* rna6_model_names[] = {
     "S6A", "S6B", "S6C", "S6D", "S6E"
 };
 const char* rna_freq_names[] = {"+F"};
@@ -1009,6 +1030,56 @@ static bool isDoubletModelName(string name) {
 }
 
 /**
+ * Split the --mset-rna value into the two independent selections:
+ *
+ *   fine_set  candidates for the 16- and 7-state selection, "considering
+ *             mismatches" ("" = the default nine models)
+ *   six_set   candidates for the 6-state selection, "ignoring mismatches"
+ *             ("" = that selection is not run)
+ *
+ * A bare --mset-rna requests both selections in full.  The keywords
+ * ALL16, ALL7 and ALL6 expand to a whole family.  Names may mix freely:
+ * each goes to its own selection; the two are never scored together.
+ */
+static void splitRnaModelSet(string model_set, bool given,
+                             string &fine_set, string &six_set) {
+    fine_set = "";
+    six_set = "";
+    if (!given)
+        return;
+    if (model_set.empty()) {
+        // bare --mset-rna: both selections, full candidate lists
+        six_set = "S6A,S6B,S6C,S6D,S6E";
+        return;   // fine_set "" means the default nine
+    }
+    StrVector names;
+    convert_string_vec(model_set.c_str(), names);
+    for (auto &raw : names) {
+        if (raw.empty())
+            continue;
+        string bare = raw.substr(0, raw.find_first_of("+*"));
+        transform(bare.begin(), bare.end(), bare.begin(), ::toupper);
+        if (bare.compare(0, 3, "RNA") == 0 && bare.length() > 3)
+            bare = "S" + bare.substr(3);
+        if (bare == "ALL16") {
+            fine_set += (fine_set.empty() ? "" : ",") + string("S16,S16A,S16B");
+        } else if (bare == "ALL7") {
+            fine_set += (fine_set.empty() ? "" : ",") + string("S7A,S7B,S7C,S7D,S7E,S7F");
+        } else if (bare == "ALL6") {
+            six_set += (six_set.empty() ? "" : ",") + string("S6A,S6B,S6C,S6D,S6E");
+        } else if (bare.compare(0, 2, "S6") == 0) {
+            six_set += (six_set.empty() ? "" : ",") + raw;
+        } else if (isDoubletModelName(raw)) {
+            fine_set += (fine_set.empty() ? "" : ",") + raw;
+        } else {
+            outError("--mset-rna: unknown RNA doublet model or keyword " + raw +
+                     "\n       models: S16..S16B, S7A..S7F, S6A..S6E;"
+                     " keywords: ALL16, ALL7, ALL6");
+        }
+    }
+}
+
+/**
  * Resolve the model set for one partition of an --rna-structure analysis,
  * which mixes DNA (loops) and doublet (stems) partitions.
  *
@@ -1023,8 +1094,15 @@ static bool isDoubletModelName(string name) {
  * @return the model set for this data type; "" means "use its built-in default".
  */
 static string resolveModelSetForSeqType(string model_set, SeqType seq_type) {
-    if (seq_type == SEQ_DOUBLET)
-        return Params::getInstance().model_set_rna;
+    if (seq_type == SEQ_DOUBLET) {
+        string fine_set, six_set;
+        splitRnaModelSet(Params::getInstance().model_set_rna,
+                         Params::getInstance().model_set_rna_given,
+                         fine_set, six_set);
+        bool six = Params::getInstance().rna_mf_six_pass ||
+                   Params::getInstance().rna_mf_six_only;
+        return six ? six_set : fine_set;
+    }
 
     // Loops: a doublet name here is a mistake.  Reject it rather than let the
     // DNA partition treat "S6A" as the name of a user-supplied model file.
@@ -1237,22 +1315,36 @@ void getModelSubst(SeqType seq_type, bool standard_code, string model_name,
             convert_string_vec(model_set.c_str(), model_names);
         }
     } else if (seq_type == SEQ_DOUBLET) {
-        // RNA doublet models are chosen only through --mset-rna, so the loops
-        // and stems partitions never contend for the same option.  Every
-        // candidate is scored on the same 16-state alignment: RNA7/RNA6 expand
-        // their rate matrix to 16x16 and the tip vector is one-hot at the
-        // observed doublet, so all candidates give the probability of exactly
-        // the same event, which is what makes their BIC comparable.
+        // RNA doublet models are chosen only through --mset-rna, which
+        // requests TWO independent selections (see splitRnaModelSet):
+        //
+        //   considering mismatches: the 16- and 7-state candidates on the
+        //   16-state alignment, where the RNA7 models expand their rate
+        //   matrix to 16x16 so every candidate gives the probability of
+        //   exactly the same event.  This winner is used for the tree.
+        //
+        //   ignoring mismatches: the 6-state candidates among themselves
+        //   on the native 6-state encoding (rna_mf_six_pass).  Reported
+        //   for information; never compared with the selection above.
         if (Params::getInstance().rna_structure_file &&
             !Params::getInstance().model_set_rna_given)
             outError("RNA doublet model selection needs --mset-rna\n"
-                     "       --mset-rna             test all 14 doublet models\n"
-                     "       --mset-rna S16,S7A     test only the models listed");
-        if (model_set.empty()) {
-            copyCString(rna_model_names, sizeof(rna_model_names) / sizeof(char*), model_names);
+                     "       --mset-rna            run both selections: the best 16- or 7-state\n"
+                     "                             model (used for the tree) and, separately,\n"
+                     "                             the best 6-state model (reported)\n"
+                     "       --mset-rna S16,S7A    selection among the listed models only\n"
+                     "       keywords ALL16, ALL7, ALL6 expand to a whole family");
+        if (Params::getInstance().rna_mf_six_pass ||
+            Params::getInstance().rna_mf_six_only) {
+            if (model_set.empty())
+                copyCString(rna6_model_names, sizeof(rna6_model_names) / sizeof(char*), model_names);
+            else
+                convert_string_vec(model_set.c_str(), model_names);
+        } else if (model_set.empty()) {
+            copyCString(rna_candidate_model_names, sizeof(rna_candidate_model_names) / sizeof(char*), model_names);
         } else if (model_set[0] == '+') {
             convert_string_vec(model_set.c_str()+1, model_names);
-            appendCString(rna_model_names, sizeof(rna_model_names) / sizeof(char*), model_names);
+            appendCString(rna_candidate_model_names, sizeof(rna_candidate_model_names) / sizeof(char*), model_names);
         } else {
             convert_string_vec(model_set.c_str(), model_names);
         }
@@ -1622,6 +1714,60 @@ void runModelFinder(Params &params, IQTree &iqtree, ModelCheckpoint &model_info,
             res_models += (*it)->aln->model_name;
         }
         iqtree.aln->model_name = res_models;
+
+        // --- The second, separate selection for the stems: "ignoring
+        // mismatches".  The selection above ("considering mismatches",
+        // 16- and 7-state candidates) chose the model the analysis
+        // continues with.  Here the 6-state candidates compete among
+        // themselves on the native 6-state encoding and the winner is
+        // reported for information only: the two selections answer
+        // different questions and their scores are never compared.
+        if (params.rna_structure_file && MPIHelper::getInstance().isMaster()) {
+            string fine_set, six_set;
+            splitRnaModelSet(params.model_set_rna, params.model_set_rna_given,
+                             fine_set, six_set);
+            if (!six_set.empty())
+            for (int part = 0; part < (int)stree->size(); part++) {
+                PhyloTree *ptree = stree->at(part);
+                if (ptree->aln->seq_type != SEQ_DOUBLET || ptree->aln->num_states != 16)
+                    continue;
+                cout << endl << "ModelFinder second selection for " << ptree->aln->name
+                     << ": ignoring mismatches" << endl;
+                cout << "(6-state candidates " << six_set
+                     << ", scored on the 6-state encoding)" << endl;
+                Alignment *aln6 = new Alignment();
+                aln6->convertDoubletToRNA6(ptree->aln);
+                aln6->name = ptree->aln->name + "6";
+                set<int> part_ids;
+                part_ids.insert(part);
+                PhyloTree *tree6 = stree->extractSubtree(part_ids);
+                tree6->setAlignment(aln6);
+                tree6->num_precision = stree->num_precision;
+                tree6->setParams(&params);
+                tree6->sse = params.SSE;
+                tree6->optimize_by_newton = params.optimize_by_newton;
+                tree6->setNumThreads(1);
+                ModelCheckpoint info6;
+                tree6->setCheckpoint(&info6);
+                tree6->restoreCheckpoint();
+                tree6->saveCheckpoint();
+                params.rna_mf_six_pass = true;
+                CandidateModelSet cset6;
+                CandidateModel best6 = cset6.test(params, tree6, info6, models_block,
+                        1, params.partition_type, aln6->name, "", false);
+                params.rna_mf_six_pass = false;
+                double score6 = best6.computeICScore(aln6->getNSite());
+                cout << "Best 6-state model: " << best6.getName() << " ("
+                     << criterionName(params.model_test_criterion) << ": "
+                     << score6 << ")" << endl;
+                cout << "NOTE: this score uses the 6-state encoding and is not"
+                        " comparable with the selection above;" << endl;
+                cout << "the tree is inferred under the considering-mismatches"
+                        " winner." << endl;
+                delete tree6;
+                delete aln6;
+            }
+        }
     } else {
         // single model selection
         CandidateModel best_model;
