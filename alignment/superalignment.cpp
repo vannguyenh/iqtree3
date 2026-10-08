@@ -948,7 +948,8 @@ void SuperAlignment::readPartitionRNA(Params &params) {
         bool is_rna7 = (stem_model.find("S7") != string::npos ||
                         stem_model.find("RNA7") != string::npos);
         bool is_rna6 = (stem_model.find("S6") != string::npos ||
-                        stem_model.find("RNA6") != string::npos);
+                        stem_model.find("RNA6") != string::npos ||
+                        params.rna_mf_six_only);
 
         Alignment *stem_aln;
         if (is_rna7) {
