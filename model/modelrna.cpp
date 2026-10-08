@@ -832,17 +832,31 @@ void ModelRNA::init(const char *model_name, string model_params,
         this->freq_type = FREQ_EMPIRICAL;
 
     // ---------------------------------------------------------------
-    // Expanded mode: RNA7/RNA6 model on a 16-state doublet alignment.
-    // This happens during model selection (ModelFinder) when all 14
-    // RNA models are tested on the same 16-state alignment.
+    // Expanded mode: an RNA7 model on a 16-state doublet alignment.
+    // This happens during model selection (ModelFinder), where every
+    // candidate is scored on the same 16-state alignment.
     //
-    // Strategy (Douglas's ambiguity coding approach):
-    //   1. Temporarily set num_states to native size (7 or 6)
-    //   2. Build native model (rates, frequencies, symmetry)
+    // RNA6 models NEVER expand.  A 6-state model has no state for a
+    // mismatch pair, so in the 16-state space it would assign the
+    // observed mismatches probability zero: it cannot answer the
+    // shared question and is not a selection candidate (see
+    // rna_candidate_model_names in phylotesting.cpp).  Fixed-model
+    // runs are unaffected: they collapse the alignment to the native
+    // 6-state encoding before the model is built.
+    //
+    // Strategy:
+    //   1. Temporarily set num_states to the native size (7)
+    //   2. Build the native model (rates, frequencies, symmetry)
     //   3. Expand to 16x16 via expandToDoubletSpace()
     //   4. Restore num_states = 16 and install expanded arrays
     //   5. Enable expanded_mode for computeTipLikelihood()
     // ---------------------------------------------------------------
+    if (isRNA6() && num_states == 16)
+        outError("6-state model " + rna_model_name + " cannot run in the "
+                 "16-state doublet space: it has no state for a mismatch "
+                 "pair. Run it as a fixed model (e.g. -m \"GTR/" +
+                 rna_model_name + "\"), which uses the native 6-state "
+                 "encoding, or select among the 16- and 7-state models.");
     if (isCollapsed() && num_states == 16) {
         int native_states = isRNA7() ? 7 : 6;
         int native_nrates = native_states * (native_states - 1) / 2;
