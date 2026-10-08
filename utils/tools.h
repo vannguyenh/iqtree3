@@ -1635,6 +1635,17 @@ public:
     /** true if --mset-rna was given on the command line */
     bool model_set_rna_given;
 
+    /** transient: true while ModelFinder runs the second, separate
+        selection among the 6-state models on the native 6-state
+        encoding (the "ignoring mismatches" selection) */
+    bool rna_mf_six_pass;
+
+    /** true when ModelFinder was asked for the 6-state selection only
+        (every --mset-rna entry is a 6-state model or ALL6): the stems are
+        then built on the native 6-state encoding from the start and the
+        single selection runs there */
+    bool rna_mf_six_only;
+
     /** set of models to be added into default set */
     char *model_extra_set;
 

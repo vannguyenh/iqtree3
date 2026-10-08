@@ -1257,6 +1257,8 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.model_set = "ALL";
     params.model_set_rna = "";
     params.model_set_rna_given = false;
+    params.rna_mf_six_pass = false;
+    params.rna_mf_six_only = false;
     params.model_extra_set = NULL;
     params.model_subset = NULL;
     params.state_freq_set = NULL;
@@ -6053,6 +6055,22 @@ void parseArg(int argc, char *argv[], Params &params) {
         bool model_finder = params.model_name.empty() ||
                             params.model_name.substr(0, 4) == "TEST" ||
                             params.model_name.substr(0, 2) == "MF";
+        if (model_finder && params.model_set_rna_given && !params.model_set_rna.empty()) {
+            // A list naming only 6-state models (or ALL6) asks for the
+            // "ignoring mismatches" selection alone.
+            StrVector names;
+            convert_string_vec(params.model_set_rna.c_str(), names);
+            bool six_only = !names.empty();
+            for (auto &raw : names) {
+                string bare = raw.substr(0, raw.find_first_of("+*"));
+                transform(bare.begin(), bare.end(), bare.begin(), ::toupper);
+                if (bare.compare(0, 4, "RNA6") == 0)
+                    bare = "S6" + bare.substr(4);
+                if (bare != "ALL6" && bare.compare(0, 2, "S6") != 0)
+                    six_only = false;
+            }
+            params.rna_mf_six_only = six_only;
+        }
         if (model_finder) {
             if (params.partition_type != BRLEN_OPTIMIZE) {
                 outWarning("model selection requires unlinked branch lengths; "
@@ -7756,6 +7774,8 @@ void Params::setDefault() {
     model_set = "ALL";
     model_set_rna = "";
     model_set_rna_given = false;
+    rna_mf_six_pass = false;
+    rna_mf_six_only = false;
     model_extra_set = nullptr;
     model_subset = nullptr;
     state_freq_set = nullptr;
