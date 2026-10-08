@@ -1255,6 +1255,10 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.model_name_init = NULL;
     params.model_opt_steps = 10;
     params.model_set = "ALL";
+    params.model_set_rna = "";
+    params.model_set_rna_given = false;
+    params.rna_mf_six_pass = false;
+    params.rna_mf_six_only = false;
     params.model_extra_set = NULL;
     params.model_subset = NULL;
     params.state_freq_set = NULL;
@@ -1636,7 +1640,10 @@ void parseArg(int argc, char *argv[], Params &params) {
     for (cnt = 1; cnt < argc; cnt++) {
         params.original_params = params.original_params + argv[cnt] + " ";
     }
-    
+    // whether the user explicitly chose an edge-linkage mode (--edge or -M);
+    // used below to give --rna-structure the RAxML-matching default
+    bool edge_specified = false;
+
     for (cnt = 1; cnt < argc; cnt++) {
         try {
 
@@ -2643,6 +2650,7 @@ void parseArg(int argc, char *argv[], Params &params) {
 			}
 			if (strcmp(argv[cnt], "-M") == 0) {
                 params.partition_type = BRLEN_OPTIMIZE;
+                edge_specified = true;
                 continue;
             }
 
@@ -2670,6 +2678,7 @@ void parseArg(int argc, char *argv[], Params &params) {
                     params.partition_type = BRLEN_OPTIMIZE;
                 else
                     throw "Use --edge equal|scale|unlink";
+                edge_specified = true;
                 continue;
             }
             
@@ -3463,6 +3472,16 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.contain_nonrev = true;
                 continue;
             }
+			if (strcmp(argv[cnt], "-mset-rna") == 0 || strcmp(argv[cnt], "--mset-rna") == 0) {
+				// Candidates for the stems (paired) partition.  The list is
+				// optional: a bare --mset-rna means all 14 doublet models.
+				params.model_set_rna_given = true;
+				if (cnt + 1 < argc && argv[cnt+1][0] != '-') {
+					cnt++;
+					params.model_set_rna = argv[cnt];
+				}
+				continue;
+			}
 			if (strcmp(argv[cnt], "-mset") == 0 || strcmp(argv[cnt], "--mset") == 0 || strcmp(argv[cnt], "--models") == 0 || strcmp(argv[cnt], "-mexchange") == 0 || strcmp(argv[cnt], "--mexchange") == 0 ) {
 				cnt++;
 				if (cnt >= argc)
@@ -6032,6 +6051,49 @@ void parseArg(int argc, char *argv[], Params &params) {
         }
 
     } // for
+
+    // RNA secondary-structure models default to the RAxML behaviour:
+    // edge-linked proportional branch lengths (--edge scale). An explicit
+    // --edge or -M, or a partition option that already set a linkage
+    // (-p/-spp/-q/-spu), still wins.
+    //
+    // Model selection is the exception.  Under BRLEN_SCALE the only correction
+    // available after a candidate model is installed is one global scale factor
+    // for the whole tree (see model/partitionmodelplen.cpp, which calls
+    // optimizeTreeLengthScaling instead of optimizeAllBranches), and that cannot
+    // recover the likelihood the new model needs.  Selection then aborts on
+    // "individual model opt reduces LnL", so use unlinked branches there.
+    if (params.rna_structure_file) {
+        bool model_finder = params.model_name.empty() ||
+                            params.model_name.substr(0, 4) == "TEST" ||
+                            params.model_name.substr(0, 2) == "MF";
+        if (model_finder && params.model_set_rna_given && !params.model_set_rna.empty()) {
+            // A list naming only 6-state models (or ALL6) asks for the
+            // "ignoring mismatches" selection alone.
+            StrVector names;
+            convert_string_vec(params.model_set_rna.c_str(), names);
+            bool six_only = !names.empty();
+            for (auto &raw : names) {
+                string bare = raw.substr(0, raw.find_first_of("+*"));
+                transform(bare.begin(), bare.end(), bare.begin(), ::toupper);
+                if (bare.compare(0, 4, "RNA6") == 0)
+                    bare = "S6" + bare.substr(4);
+                if (bare != "ALL6" && bare.compare(0, 2, "S6") != 0)
+                    six_only = false;
+            }
+            params.rna_mf_six_only = six_only;
+        }
+        if (model_finder) {
+            if (params.partition_type != BRLEN_OPTIMIZE) {
+                outWarning("model selection requires unlinked branch lengths; "
+                           "using --edge unlink for this run");
+                params.partition_type = BRLEN_OPTIMIZE;
+            }
+        } else if (!edge_specified && params.partition_type == BRLEN_OPTIMIZE) {
+            params.partition_type = BRLEN_SCALE;
+        }
+    }
+
     if (!params.user_file && !params.aln_file && !params.ngs_file && !params.ngs_mapped_reads && !params.partition_file && !params.alisim_active) {
 #ifdef IQ_TREE
         quickStartGuide();
@@ -6428,6 +6490,10 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "                       If 'mrbayes' is selected, will output a MrBayes" << endl
     << "                       Block File if Data Type is supported." << endl
     << "  --mset STR,...       Comma-separated model list (e.g. -mset WAG,LG,JTT)" << endl
+    << "                       With --rna-structure, use <loop_set>/<stem_set>" << endl
+    << "                       (e.g. -mset JC,HKY/S6A,S7A). Without a slash, each" << endl
+    << "                       partition takes the models that match its data type" << endl
+    << "                       and falls back to its default list otherwise." << endl
     << "  --msub STRING        Amino-acid model source" << endl
     << "                       (nuclear, mitochondrial, chloroplast or viral)" << endl
     << "  --mfreq STR,...      List of state frequencies" << endl
@@ -7718,6 +7784,10 @@ void Params::setDefault() {
     model_name_init = nullptr;
     model_opt_steps = 10;
     model_set = "ALL";
+    model_set_rna = "";
+    model_set_rna_given = false;
+    rna_mf_six_pass = false;
+    rna_mf_six_only = false;
     model_extra_set = nullptr;
     model_subset = nullptr;
     state_freq_set = nullptr;

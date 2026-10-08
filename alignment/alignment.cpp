@@ -1398,7 +1398,10 @@ void Alignment::computeConst(Pattern &pat) {
                     pat.const_char = j;
                     break;
                 }
-        } else if (seq_type == SEQ_DNA) {
+        } else if (seq_type == SEQ_DNA || seq_type == SEQ_DOUBLET) {
+            // SEQ_DOUBLET: RNA6 partial-mismatch codes share the DNA bitmask
+            // convention, so a constant-but-ambiguous column (e.g. all GG) gets
+            // const_char = (num_states-1) + bitmask, consistent with its code.
             pat.const_char = num_states-1;
             for (j = 0; j < num_states; j++)
                 if (state_app[j]) {
@@ -2093,6 +2096,25 @@ string Alignment::convertStateBackStr(StateType state) {
         str += symbols_dna[state%4];
         return str;
 	}
+    if (seq_type == SEQ_DOUBLET) {
+        if (num_states == 6) {
+            static const char* rna6_names[] = {"AU", "CG", "GC", "GU", "UA", "UG"};
+            if (state < 6) return rna6_names[state];
+            return "??";
+        }
+        if (num_states == 7) {
+            static const char* rna7_names[] = {"AU", "CG", "GC", "GU", "UA", "UG", "MM"};
+            if (state < 7) return rna7_names[state];
+            return "??";
+        }
+        static const char* bases = "ACGU";
+        if (state < 16) {
+            str = bases[state >> 2];
+            str += bases[state & 3];
+            return str;
+        }
+        return "??";
+    }
 
     // all other data types
     str = convertStateBack(state);
@@ -2223,7 +2245,7 @@ SeqType Alignment::getSeqType(const char *sequence_type) {
         user_seq_type = SEQ_CODON;
     } else if (strcmp(sequence_type, "GT") == 0) {
         user_seq_type = SEQ_GENOTYPE;
-    } else if (strcmp(sequence_type, "DOUBLET") == 0 || strcmp(sequence_type, "RNA16") == 0) {
+    } else if (strcmp(sequence_type, "DOUBLET") == 0) {
         user_seq_type = SEQ_DOUBLET;
     }
     return user_seq_type;
@@ -2342,6 +2364,16 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
             }
             cout << "Alignment most likely contains genotype matrix" << endl;
             break;
+        case SEQ_DOUBLET:
+            if (params.model_name.find("RNA6") != string::npos) {
+                num_states = 6;
+            } else if (params.model_name.find("RNA7") != string::npos) {
+                num_states = 7;
+            } else {
+                num_states = 16;
+            }
+            cout << "Alignment most likely contains RNA secondary-structure data" << endl;
+            break;
     default:
         if (!sequence_type) {
             throw "Unknown sequence type.";
@@ -2363,6 +2395,18 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
                 num_states = 16;
             }
             user_seq_type = SEQ_GENOTYPE;
+        } else if (strcmp(sequence_type, "DOUBLET") == 0) {
+            // RNA secondary-structure models: the state is a base PAIR, so the
+            // alphabet is the 16 doublets AA, AC, ... UU. Needed by AliSim, which
+            // has no alignment to infer the state count from.
+            if (params.model_name.find("RNA6") != string::npos) {
+                num_states = 6;
+            } else if (params.model_name.find("RNA7") != string::npos) {
+                num_states = 7;
+            } else {
+                num_states = 16;
+            }
+            user_seq_type = SEQ_DOUBLET;
         } else if (strcmp(sequence_type, "AA") == 0 || strcmp(sequence_type, "PROT") == 0) {
             num_states = 20;
             user_seq_type = SEQ_PROTEIN;
@@ -4253,6 +4297,129 @@ void Alignment::convertDNAToDoublet(Alignment *aln, vector<pair<int,int>> &pairs
             ASSERT(0);
 }
 
+// ---------------------------------------------------------------------------
+// convertDoubletToRNA7 — collapse a 16-state doublet alignment into 7 states:
+//   0=AU, 1=CG, 2=GC, 3=GU, 4=UA, 5=UG, 6=MM (RAxML ordering)
+// ---------------------------------------------------------------------------
+
+void Alignment::convertDoubletToRNA7(Alignment *aln) {
+    if (aln->seq_type != SEQ_DOUBLET || aln->num_states != 16)
+        outError("convertDoubletToRNA7: source must be a 16-state doublet alignment");
+
+    // Mapping from 16-state doublet index to RNA7 state index.
+    // Uses RAxML state ordering: AU=0, CG=1, GC=2, GU=3, UA=4, UG=5, MM=6
+    // Canonical pairs: AU(3)->0, CG(6)->1, GC(9)->2, GU(11)->3, UA(12)->4, UG(14)->5
+    // All non-canonical (mismatches): ->6
+    static const int doublet_to_rna7[16] = {
+        6, 6, 6, 0,   // AA=6, AC=6, AG=6, AU=0
+        6, 6, 1, 6,   // CA=6, CC=6, CG=1, CU=6
+        6, 2, 6, 3,   // GA=6, GC=2, GG=6, GU=3
+        4, 6, 5, 6    // UA=4, UC=6, UG=5, UU=6
+    };
+
+    // Copy sequence names and metadata from source alignment
+    for (size_t i = 0; i < aln->getNSeq(); i++)
+        seq_names.push_back(aln->getSeqName(i));
+    name          = aln->name;
+    model_name    = aln->model_name;
+    aln_file      = aln->aln_file;
+    sequence_type = "DOUBLET";
+    seq_type      = SEQ_DOUBLET;
+    num_states    = 7;
+    computeUnknownState();   // sets STATE_UNKNOWN = num_states = 7
+
+    site_pattern.resize(aln->getNSite(), -1);
+    clear();
+    pattern_index.clear();
+
+    size_t nseq = aln->getNSeq();
+    VerboseMode save_mode = verbose_mode;
+    verbose_mode = min(verbose_mode, VB_MIN);
+
+    Pattern pat;
+    pat.resize(nseq);
+    for (size_t site = 0; site < aln->getNSite(); site++) {
+        int ptn_id = aln->getPatternID(site);
+        for (size_t s = 0; s < nseq; s++) {
+            StateType st = aln->at(ptn_id)[s];
+            if (st < 16)
+                pat[s] = doublet_to_rna7[st];
+            else
+                pat[s] = STATE_UNKNOWN;
+        }
+        addPattern(pat, site);
+    }
+
+    verbose_mode = save_mode;
+    countConstSite();
+}
+
+// ---------------------------------------------------------------------------
+// convertDoubletToRNA6 — collapse a 16-state doublet alignment into 6 states:
+//   0=AU, 1=CG, 2=GC, 3=GU, 4=UA, 5=UG  (RAxML ordering)
+//   All mismatch pairs become STATE_UNKNOWN (missing data).
+// ---------------------------------------------------------------------------
+
+void Alignment::convertDoubletToRNA6(Alignment *aln) {
+    if (aln->seq_type != SEQ_DOUBLET || aln->num_states != 16)
+        outError("convertDoubletToRNA6: source must be a 16-state doublet alignment");
+
+    // Mapping from 16-state doublet index to the RNA6 observed code.
+    // Canonical pairs -> native state 0..5 (AU,CG,GC,GU,UA,UG).
+    // Mismatches -> a partial-ambiguity code (RAxML / PHASE-manual coding),
+    // using the same bitmask convention as DNA ambiguity:
+    //   code = (num_states-1) + bitmask, one bit per compatible canonical state.
+    // A canonical state is set iff the mismatch's 1st base matches its 1st base
+    // OR the mismatch's 2nd base matches its 2nd base.  So (native bitset -> code):
+    //   AA->{AU,UA}=22  AC->{AU,GC}=10  AG->{AU,CG,UG}=40  CA->{CG,UA}=23
+    //   CC->{CG,GC}=11  CU->{AU,CG,GU}=16  GA->{GC,GU,UA}=33  GG->{CG,GC,GU,UG}=51
+    //   UC->{GC,UA,UG}=57  UU->{AU,GU,UA,UG}=62
+    static const int doublet_to_rna6[16] = {
+       22, 10, 40,  0,   // AA=22, AC=10, AG=40, AU=0
+       23, 11,  1, 16,   // CA=23, CC=11, CG=1,  CU=16
+       33,  2, 51,  3,   // GA=33, GC=2,  GG=51, GU=3
+        4, 57,  5, 62    // UA=4,  UC=57, UG=5,  UU=62
+    };
+
+    // Copy sequence names and metadata from source alignment
+    for (size_t i = 0; i < aln->getNSeq(); i++)
+        seq_names.push_back(aln->getSeqName(i));
+    name          = aln->name;
+    model_name    = aln->model_name;
+    aln_file      = aln->aln_file;
+    sequence_type = "DOUBLET";
+    seq_type      = SEQ_DOUBLET;
+    num_states    = 6;
+    computeUnknownState();   // default STATE_UNKNOWN = num_states = 6, but ...
+    // ... we use the DNA-style bitmask convention for mismatch ambiguity codes,
+    // so STATE_UNKNOWN is the all-ones bitmask: (num_states-1) + (2^num_states-1).
+    STATE_UNKNOWN = (num_states - 1) + ((1 << num_states) - 1);   // = 68
+
+    site_pattern.resize(aln->getNSite(), -1);
+    clear();
+    pattern_index.clear();
+
+    size_t nseq = aln->getNSeq();
+    VerboseMode save_mode = verbose_mode;
+    verbose_mode = min(verbose_mode, VB_MIN);
+
+    Pattern pat;
+    pat.resize(nseq);
+    for (size_t site = 0; site < aln->getNSite(); site++) {
+        int ptn_id = aln->getPatternID(site);
+        for (size_t s = 0; s < nseq; s++) {
+            StateType st = aln->at(ptn_id)[s];
+            // st 0..15 = a concrete doublet -> native state or mismatch code;
+            // st >= 16 (gap/unknown in the 16-state alignment) -> full gap.
+            pat[s] = (st < 16) ? doublet_to_rna6[st] : STATE_UNKNOWN;
+        }
+        addPattern(pat, site);
+    }
+
+    verbose_mode = save_mode;
+    countConstSite();
+}
+
 Alignment *Alignment::convertCodonToAA() {
     Alignment *res = new Alignment;
     if (seq_type != SEQ_CODON) {
@@ -5651,6 +5818,7 @@ void Alignment::getAppearance(StateType state, double *state_app) {
 	int ambi_aa[] = {4+8, 32+64, 512+1024};
 	switch (seq_type) {
 	case SEQ_DNA:
+	case SEQ_DOUBLET:   // RNA6 partial-mismatch codes use the same bitmask convention
 	    state -= (num_states-1);
 		for (i = 0; i < num_states; i++)
 			if (state & (1 << i)) {
@@ -5697,6 +5865,7 @@ void Alignment::getAppearance(StateType state, StateBitset &state_app) {
 	int ambi_aa[] = {4+8, 32+64, 512+1024};
 	switch (seq_type) {
 	case SEQ_DNA:
+	case SEQ_DOUBLET:   // RNA6 partial-mismatch codes use the same bitmask convention
 	    state -= (num_states-1);
         for (i = 0; i < num_states; i++) {
             if (state & (1 << i)) {

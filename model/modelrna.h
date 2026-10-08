@@ -6,23 +6,42 @@
  *     Savill, Hoyle & Higgs (2001) Genetics 157:399-411                   *
  *   and as implemented in RAxML (Stamatakis 2014) as S16/S16A/S16B.      *
  *                                                                         *
- *   State encoding (0-15):                                                *
+ *   Also implements RNA7A through RNA7F — 7-state collapsed models where *
+ *   the 6 canonical base pairs (AU, UA, CG, GC, GU, UG) are individual  *
+ *   states and all 10 mismatches are lumped into a single MM state.      *
+ *   Naming follows the PHASE/RAxML convention (S7A..S7F).                *
+ *                                                                         *
+ *   Also implements RNA6A through RNA6E — 6-state models where only the  *
+ *   6 canonical pairs are modelled and mismatches are treated as missing  *
+ *   data.  Naming follows PHASE/RAxML (S6A..S6E).                        *
+ *                                                                         *
+ *   State encoding for RNA16 (0-15):                                      *
  *     0=AA 1=AC 2=AG 3=AU                                                 *
  *     4=CA 5=CC 6=CG 7=CU                                                 *
  *     8=GA 9=GC 10=GG 11=GU                                               *
  *     12=UA 13=UC 14=UG 15=UU                                             *
  *                                                                         *
- *   Parameter counts (free params) — verified against RAxML source:      *
- *     RNA16  (= PHASE 16A, RAxML S16):  full 16-state GTR                 *
- *                          119 free exchangeabilities + 15 free freqs     *
- *                          = 134 total                                    *
- *     RNA16A (= PHASE 16B, RAxML S16A): 5 rate classes, 1 is reference   *
- *                          => 4 free rate params + 15 free freqs = 19     *
- *     RNA16B (= PHASE 16C, RAxML S16B): 1 rate class (= reference = 1.0) *
- *                          => 0 free rate params + 15 free freqs = 15     *
- *   Both RNA16A and RNA16B have 61 forbidden (zero-rate) transitions      *
- *   (the same set for both models) corresponding to double substitutions  *
- *   and biologically disallowed pairs.                                    *
+ *   State encoding for RNA7 (0-6):                                        *
+ *     0=AU 1=CG 2=GC 3=GU 4=UA 5=UG 6=MM  (RAxML ordering)              *
+ *                                                                         *
+ *   State encoding for RNA6 (0-5):                                        *
+ *     0=AU 1=CG 2=GC 3=GU 4=UA 5=UG        (RAxML ordering)              *
+ *                                                                         *
+ *   Parameter counts (free params):                                       *
+ *     RNA16:  119 free rates + 15 free freqs = 134                        *
+ *     RNA16A:   4 free rates + 15 free freqs =  19                        *
+ *     RNA16B:   0 free rates + 15 free freqs =  15                        *
+ *     RNA7A:   20 free rates +  6 free freqs =  26  (full GTR)            *
+ *     RNA7B:   20 free rates +  3 free freqs =  23  (strand-sym freqs)    *
+ *     RNA7C:    9 free rates +  6 free freqs =  15  (forbidden + classes) *
+ *     RNA7D:    3 free rates +  6 free freqs =   9  (4 rate classes)      *
+ *     RNA7E:    1 free rate  +  6 free freqs =   7  (forbidden + 2 cls)   *
+ *     RNA7F:    3 free rates +  3 free freqs =   6  (7D + strand-sym)     *
+ *     RNA6A:   14 free rates +  5 free freqs =  19  (full GTR)            *
+ *     RNA6B:    2 free rates +  5 free freqs =   7  (3 rate classes)      *
+ *     RNA6C:    2 free rates +  2 free freqs =   4  (3 cls + strand-sym)  *
+ *     RNA6D:    1 free rate  +  2 free freqs =   3  (forbidden+strand-sym)*
+ *     RNA6E:    1 free rate  +  5 free freqs =   6  (forbidden+indep)     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -36,44 +55,38 @@
 #include "modeldna.h"
 
 /**
- * RNA 16-state doublet substitution model family (RNA16, RNA16A, RNA16B).
+ * RNA doublet substitution model family.
  *
- * Derives from ModelDNA to reuse its param_spec / param_fixed /
+ * Supports both 16-state (RNA16, RNA16A, RNA16B) and 7-state (RNA7A..RNA7F)
+ * variants.  Derives from ModelDNA to reuse its param_spec / param_fixed /
  * setRateType() machinery for constrained-rate models.
- *
- * Three variants are supported, matching RAxML's SEC_16 / SEC_16_A /
- * SEC_16_B (verified from RAxML models.c setupSecondaryStructureSymmetries):
- *
- *   RNA16  (= PHASE 16A, RAxML S16):
- *     Full 16-state GTR — 119 free exchangeabilities + 15 free freqs = 134.
- *     All 120 upper-triangle rates are independent (no param_spec needed;
- *     num_params = 119 set by ModelMarkov::setReversible).
- *
- *   RNA16A (= PHASE 16B, RAxML S16A):
- *     5 rate classes across the 59 allowed (non-zero) transitions; the class
- *     corresponding to symmetryVector value 3 is taken as the reference
- *     (fixed = 1.0), leaving 4 free rate params.  61 transitions forbidden
- *     (rate = 0.0).  15 free frequencies.  Total: 19 free params.
- *
- *   RNA16B (= PHASE 16C, RAxML S16B):
- *     All 59 allowed transitions share a single rate class (= reference,
- *     fixed = 1.0) — zero free rate params.  Same 61 forbidden transitions
- *     as RNA16A.  15 free frequencies.  Total: 15 free params.
  */
 class ModelRNA : public ModelDNA {
 public:
     /**
      * RNA model variant identifiers.
+     * RNA7 variants follow the PHASE/RAxML S7A..S7F naming.
      */
     enum RNAModelVariant {
         RNA16,    // Full 16-state GTR: 119 free rates + 15 free freqs = 134
         RNA16A,   // Constrained:         4 free rates + 15 free freqs = 19
-        RNA16B    // Equal-rates:         0 free rates + 15 free freqs = 15
+        RNA16B,   // Equal-rates:         0 free rates + 15 free freqs = 15
+        RNA7A,    // Full 7-state GTR:   20 free rates +  6 free freqs = 26
+        RNA7B,    // Full GTR rates, strand-sym freqs: 20 rates + 3 freqs = 23
+        RNA7C,    // 10 rate classes (some forbidden): 9 rates + 6 freqs = 15
+        RNA7D,    //  4 rate classes:     3 free rates +  6 free freqs = 9
+        RNA7E,    //  2 rate classes (some forbidden): 1 rate  + 6 freqs = 7
+        RNA7F,    //  4 rate classes, strand-sym freqs: 3 rates + 3 freqs = 6
+        RNA6A,    // Full 6-state GTR:   14 free rates +  5 free freqs = 19
+        RNA6B,    //  3 rate classes:     2 free rates +  5 free freqs = 7
+        RNA6C,    //  3 rate classes, strand-sym freqs: 2 rates + 2 freqs = 4
+        RNA6D,    //  2 rate classes (some forbidden), strand-sym: 1 rate + 2 freqs = 3
+        RNA6E     //  2 rate classes (some forbidden): 1 rate + 5 freqs = 6
     };
 
     /**
      * Constructor.
-     * @param model_name   "RNA16", "RNA16A", or "RNA16B"
+     * @param model_name   model variant name
      * @param model_params optional rate parameters (empty = defaults)
      * @param freq_type    state frequency type
      * @param freq_params  optional frequency parameters
@@ -99,7 +112,7 @@ public:
     virtual void init(const char *model_name, string model_params,
                       StateFreqType freq_type, string freq_params);
 
-    /** @return model name string ("RNA16", "RNA16A", or "RNA16B"). */
+    /** @return model name string. */
     virtual string getName();
 
     /** @return model name with current parameter values. */
@@ -108,8 +121,22 @@ public:
     /**
      * Compute tip likelihood vector for a doublet state.
      * Overrides ModelDNA's version which handles 4-state ambiguity codes.
+     *
+     * In expanded mode (for cross-state-space model selection), the model
+     * operates in 16-state space but the tip vector encodes ambiguity:
+     *   RNA7: mismatch doublet -> 1 at all 10 mismatch positions
+     *   RNA6: mismatch doublet -> 1 at all 16 positions (gap/uninformative)
      */
     virtual void computeTipLikelihood(PML::StateType state, double *state_lk);
+
+    /**
+     * Enable expanded mode for cross-state-space model selection.
+     * When enabled, the model uses the 16x16 expanded rate matrix and
+     * frequencies from expandToDoubletSpace(), and computeTipLikelihood()
+     * returns ambiguity-coded vectors for mismatch observations.
+     * The native model (rates, state_freq, num_states) is NOT modified.
+     */
+    void setExpandedMode(bool enable) { expanded_mode = enable; }
 
     /** Checkpoint support. */
     virtual void startCheckpoint();
@@ -117,19 +144,116 @@ public:
     virtual void restoreCheckpoint();
 
     /**
-     * RNA16 (full GTR) overrides: pack/unpack only the 58 free allowed rates,
-     * keeping forbidden rates at 0.  Delegates to ModelDNA for RNA16A/B.
+     * Full GTR overrides: pack/unpack only the free allowed rates,
+     * keeping forbidden rates at 0.  Delegates to ModelDNA for constrained variants.
      */
     virtual void setVariables(double *variables);
     virtual bool getVariables(double *variables);
 
+    /**
+     * Override getNDim() and getNDimFreq() to return the correct number
+     * of free parameters in expanded mode.  ModelMarkov uses num_states
+     * (=16) to compute freq dimensions, but expanded RNA7/RNA6 models
+     * have fewer free frequencies from their native state space.
+     * In normal mode, delegates to ModelDNA (unchanged).
+     */
+    virtual int getNDim();
+    virtual int getNDimFreq();
+
+    /**
+     * Optimisation target.
+     *
+     * In expanded mode the ten mismatch doublets of an RNA6 model deliberately
+     * carry a near-zero frequency (MIN_RATE, about 1e-4 after renormalising).
+     * ModelMarkov::targetFunk() treats any frequency below min_state_freq as a
+     * numerical error and returns 1e30, so every trial point scored the same
+     * and the optimiser could never move the rates.  Here only genuinely
+     * invalid (negative) frequencies are rejected.
+     */
+    virtual double targetFunk(double x[]);
+
+    /**
+     * Optimiser bounds.
+     *
+     * ModelMarkov::setBounds() sizes the frequency block with num_states,
+     * which is 16 in expanded mode, while getNDim() reports the NATIVE
+     * dimensions. That mismatch writes past the end of the bound arrays and
+     * corrupts the optimiser, which then reduces the likelihood and trips the
+     * assertion in PartitionModelPlen. Size everything natively here.
+     */
+    virtual void setBounds(double *lower_bound, double *upper_bound, bool *bound_check);
+
 private:
     RNAModelVariant variant;
-    string rna_model_name;  // "RNA16", "RNA16A", or "RNA16B"
+    string rna_model_name;
 
-    // For RNA16 (full GTR): maps optimizer slot i (1-based) to rates[] index.
+    /** When true, the model operates in 16-state expanded space for model
+     *  selection.  computeTipLikelihood() returns ambiguity-coded vectors.
+     *  Default: false (normal mode). */
+    bool expanded_mode = false;
+
+    /** In expanded mode: native free rate params and freq params
+     *  for correct AIC/BIC computation via getNDim()/getNDimFreq().
+     *  Set during init() expansion. */
+    int native_num_rate_params = 0;
+    int native_num_freq_params = 0;
+
+    /** In expanded mode the native (7- or 6-state) model is kept alive so the
+     *  optimiser can actually fit it.  Optimisation happens on this native
+     *  model and the result is re-expanded into the 16-state matrix; without
+     *  it the collapsed models were scored at their unfitted 1.0 start values
+     *  and every variant of a family returned the same likelihood. */
+    int          native_states       = 0;
+    double      *native_rates_arr    = nullptr;   // native nrates entries
+    double      *native_freq_arr     = nullptr;   // native_states entries
+    string       native_param_spec;
+    vector<bool> native_param_fixed;
+    int          native_num_params   = 0;
+    vector<int>  native_free_indices;
+
+    /** Scratch for pushNativeView()/popNativeView(). */
+    int          saved16_num_states  = 0;
+    double      *saved16_rates       = nullptr;
+    double      *saved16_freq        = nullptr;
+    string       saved16_param_spec;
+    vector<bool> saved16_param_fixed;
+    int          saved16_num_params  = 0;
+    vector<int>  saved16_free_indices;
+
+    /** Temporarily present the native model to the parameter-packing code,
+     *  then restore the 16-state view. */
+    void pushNativeView();
+    void popNativeView();
+
+    /** Rebuild the 16-state rates and frequencies from the native model.
+     *  Called whenever the optimiser changes the native parameters. */
+    void syncExpandedFromNative();
+
+    /** Bodies of setVariables/getVariables, run under whichever view is installed. */
+    void setVariablesImpl(double *variables);
+    bool getVariablesImpl(double *variables);
+
+    /** @return true if this is an RNA7 family variant. */
+    bool isRNA7() const { return variant >= RNA7A && variant <= RNA7F; }
+
+    /** @return true if this is an RNA6 family variant. */
+    bool isRNA6() const { return variant >= RNA6A && variant <= RNA6E; }
+
+    /** @return true if this is a collapsed (non-16-state) variant. */
+    bool isCollapsed() const { return isRNA7() || isRNA6(); }
+
+    /** @return true if this is a full GTR variant (all rates free). */
+    bool isFullGTR() const { return variant == RNA16 || variant == RNA7A || variant == RNA7B || variant == RNA6A; }
+
+    // For full GTR variants: maps optimizer slot i (1-based) to rates[] index.
     // Length = num_params.  Forbidden rates are skipped in this mapping.
-    vector<int> rna16_free_indices;
+    vector<int> rna_free_indices;
+
+    // For RNA7 models: maps RNA7 state index (0-6) to representative doublet value.
+    static const int rna7_to_doublet[7];
+
+    // For RNA6 models: maps RNA6 state index (0-5) to representative doublet value.
+    static const int rna6_to_doublet[6];
 
     /**
      * Initialise equilibrium frequencies from freq_params or alignment.
@@ -137,12 +261,26 @@ private:
     void initDoubletFrequencies(string freq_params);
 
     /**
-     * Apply the RNA16A/RNA16B symmetry vector to param_spec:
+     * Apply symmetry vector to param_spec:
      * - Sets forbidden (rate=0) entries explicitly to 0 in rates[].
-     * - Calls setRateType() with the 120-char spec string for constrained
-     *   models; for RNA16 leaves ModelMarkov's default (full GTR) in place.
+     * - Calls setRateType() with the spec string for constrained models;
+     *   for full GTR leaves ModelMarkov's default in place.
      */
     void applySymmetryVector();
+
+    /**
+     * Get the RAxML-style symmetry vector and frequency grouping for this
+     * RNA7 variant.  Returns the symmetry vector (21 entries) and frequency
+     * grouping (7 entries).
+     */
+    void getRNA7SymmetrySpec(int *sym_vec, int *freq_group) const;
+
+    /**
+     * Get the RAxML-style symmetry vector and frequency grouping for this
+     * RNA6 variant.  Returns the symmetry vector (15 entries) and frequency
+     * grouping (6 entries).
+     */
+    void getRNA6SymmetrySpec(int *sym_vec, int *freq_group) const;
 
     /**
      * Classify doublet state i:
@@ -151,11 +289,43 @@ private:
      *   2 = mismatch
      */
     static int doubletClass(int state);
+
+    // ---- Ambiguity-coding expansion for cross-state-space model selection ----
+
+    /**
+     * Expand an RNA7 or RNA6 model into 16-state doublet space.
+     *
+     * Takes the native rate matrix (rates[]) and state frequencies
+     * (state_freq[]) in the model's own state space (7 or 6 states)
+     * and produces the equivalent 16×16 rate matrix and 16 frequencies.
+     *
+     * Mapping rules:
+     *   - Each canonical pair (AU,CG,GC,GU,UA,UG) maps 1:1 to its
+     *     doublet index.
+     *   - For RNA7: the MM state frequency is split equally across
+     *     the 10 mismatch doublets; rates involving MM are replicated
+     *     for each mismatch doublet.  Mismatch↔mismatch rates = 0.
+     *   - For RNA6: mismatch doublets get near-zero frequency;
+     *     rates involving mismatches = 0.
+     *
+     * @param[out] expanded_rates   120-element upper-triangle rate array (16×16)
+     * @param[out] expanded_freqs   16-element state frequency array
+     */
+    void expandToDoubletSpace(double *expanded_rates, double *expanded_freqs) const;
+
+    /**
+     * Build the mapping from doublet index (0-15) to native state index.
+     * For RNA7: canonical doublets map to 0-5, mismatch doublets map to 6 (MM).
+     * For RNA6: canonical doublets map to 0-5, mismatch doublets map to -1.
+     */
+    static void buildDoubletToNativeMap(const int *native_to_doublet,
+                                        int native_states, int *doublet_to_native);
 };
 
 /**
- * Return the position of "+RNA16", "+RNA16A", "+RNA16B" in the model
- * name string, or string::npos if not found.
+ * Return the position of "+S16", "+S16A", "+S16B", "+S7A".."+S7F",
+ * "+S6A".."+S6E" — or their legacy "+RNA..." aliases — in the model name
+ * string, or string::npos if not found.
  */
 string::size_type posRNA(const string &model_name);
 

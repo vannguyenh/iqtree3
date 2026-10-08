@@ -670,7 +670,23 @@ public:
         @param pairs  vector of (left_col, right_col) stem pair indices
     */
     void convertDNAToDoublet(Alignment *aln, vector<pair<int,int>> &pairs);
-    
+
+    /**
+        Convert a 16-state RNA doublet alignment into a 7-state RNA7 alignment.
+        The 6 canonical pairs (AU, UA, CG, GC, GU, UG) become states 0-5;
+        all 10 mismatch pairs are lumped into state 6 (MM).
+        @param aln  source doublet alignment (must have seq_type == SEQ_DOUBLET, num_states == 16)
+    */
+    void convertDoubletToRNA7(Alignment *aln);
+
+    /**
+        Convert a 16-state RNA doublet alignment into a 6-state RNA6 alignment.
+        The 6 canonical pairs (AU, UA, CG, GC, GU, UG) become states 0-5;
+        all 10 mismatch pairs are treated as missing data (STATE_UNKNOWN).
+        @param aln  source doublet alignment (must have seq_type == SEQ_DOUBLET, num_states == 16)
+    */
+    void convertDoubletToRNA6(Alignment *aln);
+
     /**
         get Codon StateType from input sites
     */
